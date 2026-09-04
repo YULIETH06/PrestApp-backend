@@ -1,7 +1,7 @@
 import type { Server } from "socket.io";
-import type { AuthSocket } from "../interfaces/sockets/socket.interface.js";
-import { createPqrMessageService } from "../services/pqrs/pqrMessage.service.js";
-import prisma from "../config/client.js";
+import type { AuthSocket } from "../../interfaces/sockets/socket.interface.js";
+import { createPqrMessageService } from "../../services/pqrs/pqrMessage.service.js";
+import prisma from "../../config/client.js";
 
 // Cuenta los mensajes no revisados de una PQR para un usuario específico.
 const getUnreadMessagesCount = async (
@@ -84,19 +84,17 @@ export const registerPqrSocketEvents = (
                 return;
             }
 
-            if (socket.user.role === "USER" && pqr.userId !== socket.user.id) {
-                socket.emit("socket_error", {
-                    message: "No puedes acceder a esta PQR",
-                });
-                return;
-            }
+            const isOwner = pqr.userId === socket.user.id;
 
-            if (
+            const isAssignedAgent =
                 socket.user.role === "AGENT" &&
-                pqr.assignedToId !== socket.user.id
-            ) {
+                pqr.assignedToId === socket.user.id;
+
+            const isAdmin = socket.user.role === "ADMIN";
+
+            if (!isOwner && !isAssignedAgent && !isAdmin) {
                 socket.emit("socket_error", {
-                    message: "No puedes acceder a esta PQR",
+                    message: "No tienes permiso para acceder al chat de esta PQR",
                 });
                 return;
             }
@@ -152,10 +150,15 @@ export const registerPqrSocketEvents = (
             });
 
             if (pqr) {
-                const receiverIds = [pqr.userId, pqr.assignedToId].filter(
-                    (receiverId): receiverId is number =>
-                        Boolean(receiverId) && receiverId !== socket.user!.id
-                );
+                const receiverIds = [
+                    ...new Set(
+                        [pqr.userId, pqr.assignedToId].filter(
+                            (receiverId): receiverId is number =>
+                                Boolean(receiverId) &&
+                                receiverId !== socket.user!.id
+                        )
+                    ),
+                ];
 
                 await Promise.all(
                     receiverIds.map((receiverId) =>

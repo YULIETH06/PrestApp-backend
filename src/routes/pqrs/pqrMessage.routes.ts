@@ -4,8 +4,7 @@ import {
     getPqrMessagesController,
     markPqrChatAsReadController,
 } from "../../controllers/pqrs/pqrMessage.controller.js";
-import { authMiddleware } from "../../middlewares/auth.middleware.js";
-import { uploadPqrAttachment } from "../../middlewares/upload.middleware.js";
+import { authMiddleware, uploadPqrAttachment } from "../../middlewares/index.js";
 
 const router = Router();
 

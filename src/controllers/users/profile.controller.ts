@@ -1,5 +1,7 @@
 import type { Response } from "express";
+
 import prisma from "../../config/client.js";
+
 import type { AuthRequest } from "../../interfaces/auth/auth.interface.js";
 
 export const getProfile = async (
@@ -24,6 +26,8 @@ export const getProfile = async (
         name: true,
         email: true,
         role: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -35,7 +39,14 @@ export const getProfile = async (
 
     return res.status(200).json({
       message: "Perfil obtenido correctamente.",
-      user,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
     });
   } catch (error) {
     console.log(error);

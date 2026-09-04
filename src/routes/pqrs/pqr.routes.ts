@@ -12,16 +12,18 @@ import {
   assignPqrController,
   unassignPqrController,
 } from "../../controllers/pqrs/pqr.controller.js";
-import { authMiddleware } from "../../middlewares/auth.middleware.js";
-import { roleMiddleware } from "../../middlewares/role.middleware.js";
-import { uploadPqrAttachment } from "../../middlewares/upload.middleware.js";
+import {
+  authMiddleware,
+  roleMiddleware,
+  uploadPqrAttachment
+} from "../../middlewares/index.js";
 
 const router = Router();
 
 router.post(
   "/",
   authMiddleware,
-  roleMiddleware(["USER"]),
+  roleMiddleware(["USER", "AGENT"]),
   uploadPqrAttachment.single("file"),
   createPqr
 );
@@ -29,7 +31,7 @@ router.post(
 router.get(
   "/my",
   authMiddleware,
-  roleMiddleware(["USER"]),
+  roleMiddleware(["USER", "AGENT"]),
   getMyPqrs);
 
 router.get(
@@ -56,7 +58,7 @@ router.patch(
 router.patch(
   "/:id/rate",
   authMiddleware,
-  roleMiddleware(["USER"]),
+  roleMiddleware(["USER", "AGENT"]),
   ratePqrController
 );
 

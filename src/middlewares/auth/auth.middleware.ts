@@ -1,7 +1,7 @@
 import type { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import type { Role } from "@prisma/client";
-import type { AuthRequest } from "../interfaces/auth/auth.interface.js";
+import type { AuthRequest } from "../../interfaces/auth/auth.interface.js";
 
 export const authMiddleware = (
   req: AuthRequest,

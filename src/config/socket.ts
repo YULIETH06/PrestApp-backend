@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
-import { socketAuthMiddleware } from "../middlewares/socketAuth.middleware.js";
+import { socketAuthMiddleware } from "../middlewares/index.js";
 import { registerSockets } from "../sockets/index.socket.js";
 
 let ioInstance: Server | null = null;

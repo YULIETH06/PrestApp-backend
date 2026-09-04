@@ -1,23 +1,48 @@
-import { Router } from "express";
+import {
+  Router,
+} from "express";
 
 import {
   getUsers,
   getAgents,
-  loginUser,
   updateUserRole,
+  resetUserPassword,
 } from "../../controllers/users/user.controller.js";
-import { authMiddleware } from "../../middlewares/auth.middleware.js";
-import { roleMiddleware } from "../../middlewares/role.middleware.js";
+
+import {
+  registerUsersBulk,
+} from "../../controllers/users/userBulk.controller.js";
+
+import {
+  authMiddleware,
+  roleMiddleware,
+  uploadExcel,
+} from "../../middlewares/index.js";
 
 const router = Router();
 
-router.get("/", authMiddleware, roleMiddleware(["ADMIN"]), getUsers);
+router.get(
+  "/",
+  authMiddleware,
+  roleMiddleware(["ADMIN"]),
+  getUsers
+);
 
 router.get(
   "/agents",
   authMiddleware,
   roleMiddleware(["ADMIN"]),
   getAgents
+);
+
+// Registra usuarios mediante carga masiva desde archivo Excel.
+// Esta operación pertenece a la administración de usuarios.
+router.post(
+  "/bulk",
+  authMiddleware,
+  roleMiddleware(["ADMIN"]),
+  uploadExcel.single("file"),
+  registerUsersBulk
 );
 
 router.patch(
@@ -27,6 +52,12 @@ router.patch(
   updateUserRole
 );
 
-router.post("/login", loginUser);
+// Solo ADMIN puede restablecer la contraseña de otro usuario.
+router.patch(
+  "/:id/password",
+  authMiddleware,
+  roleMiddleware(["ADMIN"]),
+  resetUserPassword
+);
 
 export default router;

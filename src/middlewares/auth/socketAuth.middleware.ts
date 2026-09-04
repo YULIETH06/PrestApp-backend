@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import type { Role } from "@prisma/client";
-import type { AuthSocket } from "../interfaces/sockets/socket.interface.js";
+import type { AuthSocket } from "../../interfaces/sockets/socket.interface.js";
 import type { ExtendedError } from "socket.io";
 
 interface JwtPayload {
