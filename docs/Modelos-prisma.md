@@ -1,27 +1,141 @@
-# Documentación de modelos de tablas Prisma
+# Documentación de Modelos Prisma — Presta App
 
 ## Descripción general
 
-Este documento describe únicamente los modelos de tablas definidos en el archivo `schema.prisma`.
+Este documento describe los modelos y enums definidos actualmente en `prisma/schema.prisma`.
 
-Los modelos documentados son:
+El esquema de Presta App contiene las entidades necesarias para:
 
-```txt
-User
-PQR
-PqrMessage
-PqrChatRead
-PqrMessageAttachment
-Notification
+- Usuarios y autenticación.
+- PQR.
+- Chat y adjuntos.
+- Lectura de chats.
+- Notificaciones.
+- Catálogo de tipos de identificación.
+
+---
+
+# Enums
+
+## `Role`
+
+```prisma
+enum Role {
+  USER
+  ADMIN
+  AGENT
+}
+```
+
+| Valor | Descripción |
+| --- | --- |
+| `USER` | Usuario general |
+| `ADMIN` | Administrador |
+| `AGENT` | Agente encargado de atender PQR |
+
+## `PqrStatus`
+
+```prisma
+enum PqrStatus {
+  PENDIENTE
+  EN_PROCESO
+  CERRADA
+}
+```
+
+## `PqrCaseType`
+
+```prisma
+enum PqrCaseType {
+  SAP
+  BEAS
+  TERMINAL
+  CORREO
+  INTRANET
+  SOPORTE_EQUIPOS
+  SOPORTE_RED
+  MI_PORTAL_SAP
+  LEGALISAPP
+  NUEVAS_SOLICITUDES
+}
+```
+
+## `PqrPriority`
+
+```prisma
+enum PqrPriority {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+```
+
+## `NotificationType`
+
+```prisma
+enum NotificationType {
+  NEW_PQR
+  STATUS_CHANGE
+  PRIORITY_CHANGE
+  PQR_CLOSED
+  PQR_RATED
+  PQR_TAKEN
+  PQR_ASSIGNED
+  PQR_UNASSIGNED
+}
+```
+
+## `PqrAttachmentType`
+
+```prisma
+enum PqrAttachmentType {
+  IMAGE
+  DOCUMENT
+}
 ```
 
 ---
 
-# Modelo User
+# Modelo `IdentificationType`
 
-## Descripción
+Representa el catálogo de tipos de identificación.
 
-El modelo `User` representa a los usuarios registrados en el sistema.
+```prisma
+model IdentificationType {
+  id       Int     @id @default(autoincrement())
+  code     String  @unique @db.VarChar(20)
+  name     String  @unique @db.VarChar(100)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `id` | `Int` | Identificador único |
+| `code` | `String` | Código único, máximo 20 caracteres |
+| `name` | `String` | Nombre único, máximo 100 caracteres |
+| `isActive` | `Boolean` | Indica si puede utilizarse |
+| `createdAt` | `DateTime` | Fecha de creación |
+| `updatedAt` | `DateTime` | Fecha de última modificación |
+
+Restricciones:
+
+```prisma
+code String @unique
+name String @unique
+```
+
+Actualmente no tiene relaciones con otros modelos del esquema.
+
+---
+
+# Modelo `User`
+
+Representa a los usuarios registrados.
 
 ```prisma
 model User {
@@ -30,6 +144,9 @@ model User {
   email    String @unique
   password String
   role     Role   @default(USER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   pqrsCreated  PQR[] @relation("UserPqrs")
   pqrsAssigned PQR[] @relation("AgentPqrs")
@@ -40,28 +157,26 @@ model User {
 }
 ```
 
-## Descripción de campos
-
-| Campo         | Tipo           | Descripción                                                        |
-| ------------- | -------------- | ------------------------------------------------------------------ |
-| id            | Int            | Identificador único del usuario                                    |
-| name          | String         | Nombre del usuario                                                 |
-| email         | String         | Correo electrónico único del usuario                               |
-| password      | String         | Contraseña encriptada del usuario                                  |
-| role          | Role           | Rol del usuario dentro del sistema                                 |
-| pqrsCreated   | PQR[]          | Relación con las PQR creadas por el usuario                        |
-| pqrsAssigned  | PQR[]          | Relación con las PQR asignadas al usuario cuando actúa como agente |
-| pqrMessages   | PqrMessage[]   | Relación con los mensajes enviados por el usuario                  |
-| notifications | Notification[] | Relación con las notificaciones asociadas al usuario               |
-| pqrChatReads  | PqrChatRead[]  | Relación con los registros de lectura de chats del usuario         |
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `id` | `Int` | Identificador único |
+| `name` | `String` | Nombre del usuario |
+| `email` | `String` | Correo electrónico único |
+| `password` | `String` | Contraseña encriptada |
+| `role` | `Role` | Rol general del sistema |
+| `createdAt` | `DateTime` | Fecha de creación |
+| `updatedAt` | `DateTime` | Fecha de actualización |
+| `pqrsCreated` | `PQR[]` | PQR creadas por el usuario |
+| `pqrsAssigned` | `PQR[]` | PQR asignadas al usuario como agente |
+| `pqrMessages` | `PqrMessage[]` | Mensajes enviados |
+| `notifications` | `Notification[]` | Notificaciones recibidas |
+| `pqrChatReads` | `PqrChatRead[]` | Registros de lectura |
 
 ---
 
-# Modelo PQR
+# Modelo `PQR`
 
-## Descripción
-
-El modelo `PQR` representa las solicitudes creadas por los usuarios.
+Representa las peticiones, quejas, reclamos o solicitudes.
 
 ```prisma
 model PQR {
@@ -81,7 +196,7 @@ model PQR {
   priority PqrPriority?
 
   rating        Int?
-  ratingComment String?   @db.VarChar(300)
+  ratingComment String? @db.VarChar(300)
   ratedAt       DateTime?
 
   messages      PqrMessage[]
@@ -90,35 +205,29 @@ model PQR {
 }
 ```
 
-## Descripción de campos
-
-| Campo         | Tipo           | Descripción                                                   |
-| ------------- | -------------- | ------------------------------------------------------------- |
-| id            | Int            | Identificador único de la PQR                                 |
-| caseType      | PqrCaseType    | Tipo de caso de la PQR                                        |
-| description   | String         | Descripción de la solicitud, máximo 500 caracteres            |
-| status        | PqrStatus      | Estado actual de la PQR                                       |
-| createdAt     | DateTime       | Fecha de creación de la PQR                                   |
-| updatedAt     | DateTime       | Fecha de última actualización de la PQR                       |
-| userId        | Int            | Identificador del usuario que creó la PQR                     |
-| user          | User           | Relación con el usuario creador de la PQR                     |
-| assignedToId  | Int?           | Identificador del agente asignado                             |
-| assignedTo    | User?          | Relación con el agente asignado a la PQR                      |
-| priority      | PqrPriority?   | Prioridad asignada a la PQR                                   |
-| rating        | Int?           | Calificación dada por el usuario                              |
-| ratingComment | String?        | Comentario opcional de la calificación, máximo 300 caracteres |
-| ratedAt       | DateTime?      | Fecha en que la PQR fue calificada                            |
-| messages      | PqrMessage[]   | Relación con los mensajes asociados a la PQR                  |
-| notifications | Notification[] | Relación con las notificaciones relacionadas con la PQR       |
-| chatReads     | PqrChatRead[]  | Relación con los registros de lectura del chat de la PQR      |
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `id` | `Int` | Identificador único |
+| `caseType` | `PqrCaseType` | Tipo de caso |
+| `description` | `String` | Descripción, máximo 500 caracteres |
+| `status` | `PqrStatus` | Estado actual |
+| `createdAt` | `DateTime` | Fecha de creación |
+| `updatedAt` | `DateTime` | Fecha de actualización |
+| `userId` | `Int` | Usuario creador |
+| `assignedToId` | `Int?` | Agente asignado |
+| `priority` | `PqrPriority?` | Prioridad |
+| `rating` | `Int?` | Calificación |
+| `ratingComment` | `String?` | Comentario de calificación, máximo 300 caracteres |
+| `ratedAt` | `DateTime?` | Fecha de calificación |
+| `messages` | `PqrMessage[]` | Mensajes del chat |
+| `notifications` | `Notification[]` | Notificaciones relacionadas |
+| `chatReads` | `PqrChatRead[]` | Lecturas del chat |
 
 ---
 
-# Modelo PqrMessage
+# Modelo `PqrMessage`
 
-## Descripción
-
-El modelo `PqrMessage` representa los mensajes enviados dentro del chat de una PQR.
+Representa un mensaje dentro del chat.
 
 ```prisma
 model PqrMessage {
@@ -136,28 +245,13 @@ model PqrMessage {
 }
 ```
 
-## Descripción de campos
-
-| Campo       | Tipo                   | Descripción                                             |
-| ----------- | ---------------------- | ------------------------------------------------------- |
-| id          | Int                    | Identificador único del mensaje                         |
-| content     | String?                | Contenido del mensaje, máximo 500 caracteres            |
-| createdAt   | DateTime               | Fecha de creación del mensaje                           |
-| pqrId       | Int                    | Identificador de la PQR a la que pertenece el mensaje   |
-| pqr         | PQR                    | Relación con la PQR a la que pertenece el mensaje       |
-| senderId    | Int                    | Identificador del usuario que envió el mensaje          |
-| sender      | User                   | Relación con el usuario que envió el mensaje            |
-| attachments | PqrMessageAttachment[] | Relación con los archivos adjuntos asociados al mensaje |
+Un mensaje puede contener texto, adjuntos o ambos.
 
 ---
 
-# Modelo PqrChatRead
+# Modelo `PqrChatRead`
 
-## Descripción
-
-El modelo `PqrChatRead` representa la lectura del chat de una PQR por parte de un usuario.
-
-Sirve para guardar cuándo un usuario revisó por última vez el chat de una PQR.
+Registra la última lectura del chat por usuario.
 
 ```prisma
 model PqrChatRead {
@@ -173,46 +267,19 @@ model PqrChatRead {
 }
 ```
 
-## Descripción de campos
-
-| Campo      | Tipo     | Descripción                                  |
-| ---------- | -------- | -------------------------------------------- |
-| id         | Int      | Identificador único del registro             |
-| pqrId      | Int      | Identificador de la PQR relacionada          |
-| userId     | Int      | Identificador del usuario que revisó el chat |
-| lastReadAt | DateTime | Fecha y hora de la última revisión del chat  |
-| pqr        | PQR      | Relación con la PQR revisada                 |
-| user       | User     | Relación con el usuario que revisó el chat   |
-
-## Restricción única
+La restricción:
 
 ```prisma
 @@unique([pqrId, userId])
 ```
 
-Esta restricción evita que exista más de un registro de lectura para el mismo usuario dentro de la misma PQR.
-
-Ejemplo permitido:
-
-```txt
-PQR 8 - Usuario 3
-PQR 8 - Usuario 5
-```
-
-Ejemplo no permitido:
-
-```txt
-PQR 8 - Usuario 3
-PQR 8 - Usuario 3
-```
+garantiza un único registro de lectura por usuario y PQR.
 
 ---
 
-# Modelo PqrMessageAttachment
+# Modelo `PqrMessageAttachment`
 
-## Descripción
-
-El modelo `PqrMessageAttachment` representa los archivos adjuntos enviados en los mensajes del chat de una PQR.
+Representa los archivos adjuntos de los mensajes.
 
 ```prisma
 model PqrMessageAttachment {
@@ -230,28 +297,21 @@ model PqrMessageAttachment {
 }
 ```
 
-## Descripción de campos
-
-| Campo        | Tipo              | Descripción                                                 |
-| ------------ | ----------------- | ----------------------------------------------------------- |
-| id           | Int               | Identificador único del archivo adjunto                     |
-| fileName     | String            | Nombre generado para almacenar el archivo                   |
-| originalName | String            | Nombre original del archivo subido                          |
-| fileUrl      | String            | Ruta donde se encuentra almacenado el archivo               |
-| fileType     | PqrAttachmentType | Tipo de archivo adjunto                                     |
-| mimeType     | String            | Tipo MIME del archivo                                       |
-| fileSize     | Int               | Tamaño del archivo                                          |
-| createdAt    | DateTime          | Fecha de carga del archivo                                  |
-| messageId    | Int               | Identificador del mensaje relacionado                       |
-| message      | PqrMessage        | Relación con el mensaje al que pertenece el archivo adjunto |
+| Campo | Descripción |
+| --- | --- |
+| `fileName` | Nombre generado para almacenar el archivo |
+| `originalName` | Nombre original |
+| `fileUrl` | Ruta del archivo |
+| `fileType` | `IMAGE` o `DOCUMENT` |
+| `mimeType` | Tipo MIME |
+| `fileSize` | Tamaño en bytes |
+| `messageId` | Mensaje relacionado |
 
 ---
 
-# Modelo Notification
+# Modelo `Notification`
 
-## Descripción
-
-El modelo `Notification` representa las notificaciones internas generadas para los usuarios.
+Representa las notificaciones internas.
 
 ```prisma
 model Notification {
@@ -269,25 +329,25 @@ model Notification {
 }
 ```
 
-## Descripción de campos
-
-| Campo     | Tipo             | Descripción                                        |
-| --------- | ---------------- | -------------------------------------------------- |
-| id        | Int              | Identificador único de la notificación             |
-| title     | String           | Título de la notificación                          |
-| message   | String           | Mensaje de la notificación                         |
-| type      | NotificationType | Tipo de notificación                               |
-| isRead    | Boolean          | Indica si la notificación fue leída                |
-| userId    | Int              | Identificador del usuario destinatario             |
-| pqrId     | Int?             | Identificador opcional de la PQR relacionada       |
-| createdAt | DateTime         | Fecha de creación de la notificación               |
-| user      | User             | Relación con el usuario que recibe la notificación |
-| pqr       | PQR?             | Relación con la PQR asociada a la notificación     |
+Las notificaciones están asociadas con usuarios y, opcionalmente, con una PQR.
 
 ---
 
-# Conclusión
+# Relaciones principales
 
-Este documento describe únicamente los modelos que representan tablas en la base de datos.
+```txt
+User
+├── crea -> PQR
+├── atiende -> PQR
+├── envía -> PqrMessage
+├── recibe -> Notification
+└── registra lectura -> PqrChatRead
 
-Los modelos permiten organizar la información de usuarios, PQR, mensajes, archivos adjuntos, notificaciones y registros de lectura del chat.
+PQR
+├── tiene -> PqrMessage
+├── tiene -> Notification
+└── tiene -> PqrChatRead
+
+PqrMessage
+└── tiene -> PqrMessageAttachment
+```

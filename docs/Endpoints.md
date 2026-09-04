@@ -1,22 +1,48 @@
-# Endpoints funcionales
+# Endpoints funcionales — Presta App
 
-Actualmente el backend cuenta con endpoints funcionales para validación, autenticación, manejo seguro de usuarios mediante JWT, administración de PQR y consulta del historial de mensajes del chat.
+## Descripción general
+
+Este documento describe los endpoints funcionales actuales del backend de **Presta App**.
+
+La API está organizada en los siguientes módulos:
+
+```txt
+Health Check
+Autenticación
+Usuarios
+Common
+PQR
+Chat de PQR
+Notificaciones
+```
+
+Las rutas protegidas utilizan autenticación mediante **JWT**. Los permisos adicionales se controlan mediante roles y, en las operaciones de PQR, también mediante la relación del usuario autenticado con la solicitud.
 
 ---
 
-## Health Check
+# Health Check
+
+## Endpoint
 
 ```http
 GET /api/health
 ```
 
-### Descripción
+## Descripción
 
-Endpoint utilizado para verificar el correcto funcionamiento de la API.
+Endpoint utilizado para verificar que la API se encuentra disponible y funcionando correctamente.
 
 ---
 
-### Respuesta exitosa
+## Acceso permitido
+
+```txt
+Público
+```
+
+---
+
+## Respuesta exitosa
 
 ```json
 {
@@ -25,6 +51,7 @@ Endpoint utilizado para verificar el correcto funcionamiento de la API.
 ```
 
 ---
+
 
 # Registrar usuario
 
@@ -47,7 +74,6 @@ Funciones implementadas:
 * Validación de longitud mínima de contraseña.
 * Verificación de email existente.
 * Encriptación segura de contraseña con bcrypt.
-* Registro en MySQL mediante Prisma.
 * Protección de contraseña en respuestas.
 
 ---
@@ -176,21 +202,339 @@ Funciones implementadas:
 
 ---
 
-# Carga masiva de usuarios
+
+---
+
+
+# Login de usuario JWT
 
 ## Endpoint
 
 ```http
-POST /api/auth/register/bulk
+POST /api/auth/login
 ```
 
 ## Descripción
 
-Endpoint encargado de registrar usuarios mediante carga masiva desde un archivo Excel.
+Endpoint encargado de autenticar usuarios registrados mediante JWT.
+
+Funciones implementadas:
+
+* Validación de email.
+* Validación de contraseña.
+* Comparación segura con bcrypt.
+* Generación de token JWT.
+* Retorno del usuario autenticado.
+* Protección de credenciales sensibles.
+
+---
+
+## Body
+
+```json
+{
+  "email": "juan@gmail.com",
+  "password": "123456"
+}
+```
+
+---
+
+## Respuesta exitosa
+
+```json
+{
+  "message": "Login exitoso",
+  "token": "JWT_TOKEN",
+  "user": {
+    "id": 1,
+    "name": "Juan",
+    "email": "juan@gmail.com",
+    "role": "USER"
+  }
+}
+```
+
+---
+
+## Respuesta credenciales inválidas
+
+```json
+{
+  "message": "Credenciales inválidas"
+}
+```
+
+---
+
+## Respuesta en caso de error
+
+```json
+{
+  "message": "Error al iniciar sesión"
+}
+```
+
+---
+
+
+---
+
+
+# Cambiar contraseña del usuario autenticado
+
+## Endpoint protegido
+
+```http
+PATCH /api/auth/password
+```
+
+## Descripción
+
+Endpoint privado encargado de permitir que el usuario autenticado cambie su propia contraseña de acceso al sistema.
+
+La funcionalidad solicita la contraseña actual y una nueva contraseña. Antes de realizar el cambio, el sistema verifica que la contraseña actual corresponda con la contraseña almacenada para el usuario autenticado.
+
+El usuario se identifica mediante el token JWT, por lo tanto, no es necesario enviar el identificador del usuario en el body.
+
+La nueva contraseña se almacena de forma segura mediante `bcryptjs`.
+
+---
+
+## Header requerido
+
+```http
+Authorization: Bearer TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Acceso permitido
+
+```txt
+USER
+ADMIN
+AGENT
+```
+
+Cualquier usuario autenticado puede cambiar únicamente su propia contraseña.
+
+---
+
+## Body
+
+```json
+{
+  "currentPassword": "123456",
+  "newPassword": "654321"
+}
+```
+
+---
+
+## Campos del body
+
+| Campo           | Tipo   | Obligatorio | Descripción                             |
+| --------------- | ------ | ----------- | --------------------------------------- |
+| currentPassword | string | Sí          | Contraseña actual del usuario           |
+| newPassword     | string | Sí          | Nueva contraseña que se desea registrar |
+
+---
+
+## Validaciones implementadas
+
+### Contraseña actual
+
+* Es obligatoria.
+* Debe corresponder con la contraseña actual del usuario autenticado.
+* Se compara de forma segura mediante `bcryptjs`.
+
+### Nueva contraseña
+
+* Es obligatoria.
+* Debe tener mínimo 6 caracteres.
+* Debe ser diferente de la contraseña actual.
+* Se almacena encriptada mediante `bcryptjs`.
+
+### Seguridad
+
+* La ruta requiere autenticación mediante JWT.
+* El identificador del usuario se obtiene desde el token.
+* Un usuario no puede cambiar la contraseña de otro usuario mediante este endpoint.
+* La contraseña ni su hash se devuelven en la respuesta.
+
+---
+
+## Respuesta exitosa
+
+```json
+{
+  "message": "Contraseña actualizada correctamente"
+}
+```
+
+---
+
+## Respuesta si faltan campos
+
+```json
+{
+  "message": "La contraseña actual y la nueva contraseña son obligatorias"
+}
+```
+
+---
+
+## Respuesta si la nueva contraseña tiene menos de 6 caracteres
+
+```json
+{
+  "message": "La nueva contraseña debe tener mínimo 6 caracteres"
+}
+```
+
+---
+
+## Respuesta si la contraseña actual es incorrecta
+
+```json
+{
+  "message": "La contraseña actual es incorrecta"
+}
+```
+
+---
+
+## Respuesta si la nueva contraseña es igual a la actual
+
+```json
+{
+  "message": "La nueva contraseña debe ser diferente a la contraseña actual"
+}
+```
+
+---
+
+## Respuesta si el usuario no está autenticado
+
+```json
+{
+  "message": "Token no proporcionado"
+}
+```
+
+---
+
+## Respuesta token inválido
+
+```json
+{
+  "message": "Token inválido o expirado."
+}
+```
+
+---
+
+## Respuesta si el usuario no existe
+
+```json
+{
+  "message": "El usuario no existe"
+}
+```
+
+---
+
+## Respuesta en caso de error
+
+```json
+{
+  "message": "Error al cambiar la contraseña"
+}
+```
+
+---
+
+
+---
+
+
+# Perfil autenticado
+
+## Endpoint protegido
+
+```http
+GET /api/profile
+```
+
+## Descripción
+
+Endpoint privado encargado de obtener la información del usuario autenticado mediante token JWT.
+
+La ruta utiliza middleware JWT para restringir el acceso únicamente a usuarios autenticados.
+
+---
+
+## Header requerido
+
+```http
+Authorization: Bearer TOKEN
+```
+
+---
+
+## Respuesta exitosa
+
+```json
+{
+  "message": "Perfil obtenido correctamente.",
+  "user": {
+    "id": 5,
+    "name": "Marlon",
+    "email": "marlon@gmail.com",
+    "role": "USER"
+  }
+}
+```
+
+---
+
+
+---
+
+
+# Carga masiva de usuarios
+
+## Endpoint protegido para ADMIN
+
+```http
+POST /api/users/bulk
+```
+
+## Descripción
+
+Endpoint privado encargado de registrar usuarios mediante carga masiva desde un archivo Excel.
 
 Esta funcionalidad permite subir un archivo con varios usuarios y procesarlos de forma automática. El sistema lee el archivo, valida la información de cada fila y registra los usuarios en la base de datos.
 
-En esta carga masiva, el administrador puede definir el rol de cada usuario mediante la columna `role`.
+En esta carga masiva, el administrador puede definir el rol de cada usuario mediante la columna `rol`.
+
+La operación pertenece al módulo de usuarios y requiere que el usuario autenticado tenga rol `ADMIN`.
+
+---
+
+## Header requerido
+
+```http
+Authorization: Bearer TOKEN_ADMIN
+```
+
+---
+
+## Acceso permitido
+
+* ADMIN
 
 ---
 
@@ -216,7 +560,7 @@ nombre | correo | contraseña | rol
 
 ### Ejemplo
 
-| name       | email                                   | contraseña | rol   |
+| nombre     | correo                                  | contraseña | rol   |
 | ---------- | --------------------------------------- | ---------- | ----- |
 | Juan Pérez | [juan@gmail.com](mailto:juan@gmail.com) | 123456     | USER  |
 | Ana María  | [ana@gmail.com](mailto:ana@gmail.com)   | 123456     | AGENT |
@@ -236,7 +580,7 @@ nombre | correo | contraseña | rol
 
 ```txt
 Método: POST
-URL: http://localhost:4000/api/auth/register/bulk
+URL: http://localhost:4000/api/users/bulk
 Body: form-data
 Key: file
 Type: File
@@ -358,7 +702,7 @@ AGENT
 
 ```json
 {
-  "message": "El archivo Excel no tiene las columnas requeridas: role. Las columnas obligatorias son: name, email, password y role."
+  "message": "El archivo Excel no tiene las columnas requeridas, las columnas obligatorias son: nombre, correo, contraseña y rol."
 }
 ```
 
@@ -405,7 +749,7 @@ AGENT
 "totalErrors": 1,
 "errors": [
   {
-    "column": "name",
+    "column": "nombre",
     "message": "El nombre solo puede contener letras"
   }
 ]
@@ -420,7 +764,7 @@ AGENT
 "totalErrors": 1,
 "errors": [
   {
-    "column": "email",
+    "column": "correo",
     "message": "El correo electrónico no tiene un formato válido"
   }
 ]
@@ -435,7 +779,7 @@ AGENT
 "totalErrors": 1,
 "errors": [
   {
-    "column": "role",
+    "column": "rol",
     "message": "Rol no válido. Los roles permitidos son USER, ADMIN y AGENT"
   }
 ]
@@ -450,7 +794,7 @@ AGENT
 "totalErrors": 1,
 "errors": [
   {
-    "column": "email",
+    "column": "correo",
     "message": "Correo duplicado dentro del archivo"
   }
 ]
@@ -465,7 +809,7 @@ AGENT
 "totalErrors": 1,
 "errors": [
   {
-    "column": "email",
+    "column": "correo",
     "message": "El usuario ya existe"
   }
 ]
@@ -480,7 +824,7 @@ AGENT
 "totalErrors": 1,
 "errors": [
   {
-    "column": "password",
+    "column": "contraseña",
     "message": "La contraseña debe tener mínimo 6 caracteres"
   }
 ]
@@ -496,6 +840,10 @@ AGENT
 ```
 
 ---
+
+
+---
+
 
 # Obtener usuarios
 
@@ -566,6 +914,10 @@ Authorization: Bearer TOKEN_ADMIN
 ```
 
 ---
+
+
+---
+
 
 # Obtener agentes
 
@@ -651,6 +1003,10 @@ Authorization: Bearer TOKEN_ADMIN
 
 
 ---
+
+
+---
+
 
 # Cambiar rol de usuario
 
@@ -790,26 +1146,52 @@ AGENT
 
 ---
 
-# Login de usuario JWT
 
-## Endpoint
+---
+
+
+# Restablecer contraseña de un usuario
+
+## Endpoint protegido para ADMIN
 
 ```http
-POST /api/users/login
+PATCH /api/users/:id/password
+```
+
+## Ejemplo
+
+```http
+PATCH /api/users/5/password
 ```
 
 ## Descripción
 
-Endpoint encargado de autenticar usuarios registrados mediante JWT.
+Endpoint privado encargado de permitir que un usuario con rol `ADMIN` restablezca la contraseña de otro usuario registrado en el sistema.
 
-Funciones implementadas:
+A diferencia del cambio de contraseña del usuario autenticado, esta operación no requiere conocer ni enviar la contraseña actual del usuario. El administrador únicamente define la nueva contraseña.
 
-* Validación de email.
-* Validación de contraseña.
-* Comparación segura con bcrypt.
-* Generación de token JWT.
-* Retorno del usuario autenticado.
-* Protección de credenciales sensibles.
+---
+
+## Header requerido
+
+```http
+Authorization: Bearer TOKEN_ADMIN
+Content-Type: application/json
+```
+
+---
+
+## Acceso permitido
+
+* ADMIN
+
+---
+
+## Parámetros
+
+| Parámetro | Tipo   | Descripción                                                     |
+| --------- | ------ | --------------------------------------------------------------- |
+| id        | number | Identificador del usuario al que se le restablecerá la contraseña |
 
 ---
 
@@ -817,10 +1199,35 @@ Funciones implementadas:
 
 ```json
 {
-  "email": "juan@gmail.com",
-  "password": "123456"
+  "newPassword": "654321"
 }
 ```
+
+---
+
+## Campos del body
+
+| Campo       | Tipo   | Obligatorio | Descripción                                      |
+| ----------- | ------ | ----------- | ------------------------------------------------ |
+| newPassword | string | Sí          | Nueva contraseña que se asignará al usuario      |
+
+---
+
+## Validaciones implementadas
+
+### Identificador del usuario
+
+* Debe ser un número entero válido.
+* Debe ser mayor que cero.
+* El usuario debe existir en la base de datos.
+
+### Nueva contraseña
+
+* Es obligatoria.
+* Debe contener mínimo 6 caracteres.
+* Debe ser diferente de la contraseña actual del usuario.
+* Se compara de forma segura con la contraseña actual mediante `bcryptjs`.
+* Se almacena encriptada mediante `bcryptjs`.
 
 ---
 
@@ -828,11 +1235,10 @@ Funciones implementadas:
 
 ```json
 {
-  "message": "Login exitoso",
-  "token": "JWT_TOKEN",
+  "message": "Contraseña del usuario actualizada correctamente",
   "user": {
-    "id": 1,
-    "name": "Juan",
+    "id": 5,
+    "name": "Juan Pérez",
     "email": "juan@gmail.com",
     "role": "USER"
   }
@@ -841,11 +1247,81 @@ Funciones implementadas:
 
 ---
 
-## Respuesta credenciales inválidas
+## Respuesta si el id no es válido
 
 ```json
 {
-  "message": "Credenciales inválidas"
+  "message": "El id del usuario no es válido"
+}
+```
+
+---
+
+## Respuesta si no se envía la nueva contraseña
+
+```json
+{
+  "message": "La nueva contraseña es obligatoria"
+}
+```
+
+---
+
+## Respuesta si la nueva contraseña tiene menos de 6 caracteres
+
+```json
+{
+  "message": "La nueva contraseña debe tener mínimo 6 caracteres"
+}
+```
+
+---
+
+## Respuesta si la nueva contraseña es igual a la actual
+
+```json
+{
+  "message": "La nueva contraseña debe ser diferente a la contraseña actual"
+}
+```
+
+---
+
+## Respuesta si el usuario no existe
+
+```json
+{
+  "message": "El usuario no existe"
+}
+```
+
+---
+
+## Respuesta si el usuario autenticado no es ADMIN
+
+```json
+{
+  "message": "No tienes permisos para acceder a esta ruta"
+}
+```
+
+---
+
+## Respuesta si el usuario no está autenticado
+
+```json
+{
+  "message": "Token no proporcionado"
+}
+```
+
+---
+
+## Respuesta token inválido
+
+```json
+{
+  "message": "Token inválido o expirado."
 }
 ```
 
@@ -855,25 +1331,29 @@ Funciones implementadas:
 
 ```json
 {
-  "message": "Error al iniciar sesión"
+  "message": "Error al actualizar la contraseña del usuario"
 }
 ```
 
 ---
 
-# Perfil autenticado
+
+---
+
+
+# Obtener tipos de identificación activos
 
 ## Endpoint protegido
 
 ```http
-GET /api/profile
+GET /api/common/identification-types
 ```
 
 ## Descripción
 
-Endpoint privado encargado de obtener la información del usuario autenticado mediante token JWT.
+Endpoint privado encargado de obtener los tipos de identificación activos registrados en el sistema.
 
-La ruta utiliza middleware JWT para restringir el acceso únicamente a usuarios autenticados.
+El endpoint pertenece al módulo común del sistema y devuelve únicamente los tipos de identificación que se encuentran activos.
 
 ---
 
@@ -885,21 +1365,71 @@ Authorization: Bearer TOKEN
 
 ---
 
+## Acceso permitido
+
+```txt
+USER
+ADMIN
+AGENT
+```
+
+---
+
 ## Respuesta exitosa
 
 ```json
 {
-  "message": "Perfil obtenido correctamente.",
-  "user": {
-    "id": 5,
-    "name": "Marlon",
-    "email": "marlon@gmail.com",
-    "role": "USER"
-  }
+  "message": "Tipos de identificación obtenidos correctamente",
+  "identificationTypes": [
+    {
+      "id": 1,
+      "code": "CC",
+      "name": "Cédula de ciudadanía"
+    },
+    {
+      "id": 2,
+      "code": "CE",
+      "name": "Cédula de extranjería"
+    }
+  ]
 }
 ```
 
 ---
+
+## Respuesta si el usuario no está autenticado
+
+```json
+{
+  "message": "Token no proporcionado"
+}
+```
+
+---
+
+## Respuesta token inválido
+
+```json
+{
+  "message": "Token inválido o expirado."
+}
+```
+
+---
+
+## Respuesta en caso de error
+
+```json
+{
+  "message": "Error al obtener los tipos de identificación"
+}
+```
+
+---
+
+
+---
+
 
 # Crear PQR
 
@@ -916,6 +1446,13 @@ Endpoint privado encargado de registrar una nueva PQR asociada al usuario autent
 Al crear una PQR, el sistema crea automáticamente un primer mensaje dentro del chat de la solicitud usando la descripción registrada por el usuario.
 
 Si el usuario adjunta una imagen o documento al momento de crear la PQR, ese archivo queda asociado al primer mensaje del chat como evidencia inicial.
+
+---
+
+## Acceso permitido
+
+* USER
+* AGENT
 
 ---
 
@@ -961,7 +1498,7 @@ multipart/form-data
 
 ---
 
-# Tipos de caso disponibles
+## Tipos de caso disponibles
 
 ```txt
 SAP
@@ -1009,7 +1546,7 @@ Tamaño máximo permitido:
 
 ## Notificación automática
 
-Cuando un usuario crea una nueva PQR, el sistema genera automáticamente una notificación para los usuarios con rol `ADMIN` y `AGENT`.
+Cuando un usuario con rol `USER` o `AGENT` crea una nueva PQR, el sistema genera automáticamente una notificación para los usuarios con rol `ADMIN` y `AGENT`.
 
 | Destinatario | Tipo    | Mensaje                                             |
 | ------------ | ------- | --------------------------------------------------- |
@@ -1142,6 +1679,10 @@ El usuario que crea la PQR no recibe esta notificación.
 
 ---
 
+
+---
+
+
 # Obtener PQR del usuario autenticado
 
 ## Endpoint protegido
@@ -1153,6 +1694,13 @@ GET /api/pqrs/my
 ## Descripción
 
 Endpoint privado encargado de obtener las PQR registradas por el usuario autenticado.
+
+---
+
+## Acceso permitido
+
+* USER
+* AGENT
 
 ---
 
@@ -1185,6 +1733,10 @@ Authorization: Bearer TOKEN
 ```
 
 ---
+
+
+---
+
 
 # Obtener todas las PQR
 
@@ -1250,6 +1802,10 @@ Authorization: Bearer TOKEN_ADMIN
 
 ---
 
+
+---
+
+
 # Obtener PQR disponibles para AGENT
 
 ## Endpoint protegido para ADMIN / AGENT
@@ -1312,6 +1868,10 @@ Authorization: Bearer TOKEN_AGENT
 
 ---
 
+
+---
+
+
 # Tomar una PQR disponible
 
 ## Endpoint protegido para ADMIN / AGENT
@@ -1358,7 +1918,7 @@ Cuando un agente toma una PQR disponible, el sistema genera automáticamente dos
 | Destinatario         | Tipo      | Mensaje                                                                                  |
 | -------------------- | --------- | ---------------------------------------------------------------------------------------- |
 | ADMIN                | PQR_TAKEN | Carlos Agente (carlos@gmail.com) tomó la PQR #10 creada por Juan Pérez (juan@gmail.com). |
-| USER dueño de la PQR | PQR_TAKEN | Tu solicitud #10 ya fue tomada por un agente.                                            |
+| creador de la PQR | PQR_TAKEN | Tu solicitud #10 ya fue tomada por un agente.                                            |
 
 Tomar una PQR no cambia automáticamente el estado de la solicitud. Solo se actualiza el campo `assignedToId`.
 
@@ -1395,6 +1955,10 @@ Tomar una PQR no cambia automáticamente el estado de la solicitud. Solo se actu
 ```
 
 ---
+
+
+---
+
 
 # Asignar o reasignar una PQR
 
@@ -1464,7 +2028,7 @@ Cuando un ADMIN asigna o reasigna una PQR, el sistema genera notificaciones seg�
 | Destinatario         | Tipo         | Mensaje                                       |
 | -------------------- | ------------ | --------------------------------------------- |
 | AGENT asignado       | PQR_ASSIGNED | Se te asignó la PQR #10.                      |
-| USER dueño de la PQR | PQR_TAKEN    | Tu solicitud #10 ya fue tomada por un agente. |
+| creador de la PQR | PQR_TAKEN    | Tu solicitud #10 ya fue tomada por un agente. |
 
 ### Reasignación a otro agente
 
@@ -1576,6 +2140,10 @@ Cuando un ADMIN asigna o reasigna una PQR, el sistema genera notificaciones seg�
 ```
 
 ---
+
+
+---
+
 
 # Desasignar una PQR
 
@@ -1705,6 +2273,10 @@ Cuando un ADMIN desasigna una PQR, el sistema notifica al agente que fue retirad
 
 ---
 
+
+---
+
+
 # Obtener PQR asignadas al AGENT autenticado
 
 ## Endpoint protegido para ADMIN / AGENT
@@ -1770,6 +2342,10 @@ Authorization: Bearer TOKEN_AGENT
 ```
 
 ---
+
+
+---
+
 
 # Cambiar estado de una PQR
 
@@ -1841,7 +2417,7 @@ Cuando una PQR cambia a estado `CERRADA`, el sistema genera automáticamente una
 
 | Destinatario         | Tipo       | Mensaje                                                                |
 | -------------------- | ---------- | ---------------------------------------------------------------------- |
-| USER dueño de la PQR | PQR_CLOSED | Tu solicitud #10 fue cerrada. Por favor califica la atención recibida. |
+| creador de la PQR | PQR_CLOSED | Tu solicitud #10 fue cerrada. Por favor califica la atención recibida. |
 
 La notificación solo se genera cuando la PQR pasa a estado `CERRADA`.
 
@@ -1912,6 +2488,10 @@ Si la PQR ya estaba cerrada y se vuelve a enviar el mismo estado, no se debe cre
 ```
 
 ---
+
+
+---
+
 
 # Cambiar prioridad de una PQR
 
@@ -2078,6 +2658,10 @@ Content-Type: application/json
 
 ---
 
+
+---
+
+
 # Obtener historial de mensajes de una PQR
 
 ## Endpoint protegido
@@ -2106,9 +2690,12 @@ Authorization: Bearer TOKEN
 
 ## Acceso permitido
 
-* USER dueño de la PQR.
+* USER creador de la PQR.
+* AGENT creador de la PQR.
 * AGENT asignado a la PQR.
-* ADMIN según reglas del sistema.
+* ADMIN.
+
+La autorización se basa en la relación del usuario con la PQR. Un `AGENT` puede acceder tanto a una PQR creada por él como a una PQR que tenga asignada.
 
 ---
 
@@ -2229,25 +2816,19 @@ Si el mensaje tiene un archivo, se devuelve dentro del arreglo `attachments`.
 
 ---
 
-## Respuesta si el USER no es dueño de la PQR
+## Respuesta si el usuario no tiene acceso a la PQR
 
 ```json
 {
-  "message": "Solo puedes ver los mensajes de tus PQR"
+  "message": "No tienes permiso para ver los mensajes de esta PQR"
 }
 ```
 
 ---
 
-## Respuesta si el AGENT no tiene asignada la PQR
-
-```json
-{
-  "message": "Solo puedes ver los mensajes de las PQR asignadas a ti"
-}
-```
 
 ---
+
 
 # Marcar chat de PQR como leído
 
@@ -2268,16 +2849,19 @@ Este endpoint se utiliza cuando el usuario o agente abre el chat de una PQR. El 
 ## Header requerido
 
 ```http
-Authorization: Bearer TOKEN_ADMIN
+Authorization: Bearer TOKEN
 ```
 
 ---
 
 ## Acceso permitido
 
-* USER dueño de la PQR.
+* USER creador de la PQR.
+* AGENT creador de la PQR.
 * AGENT asignado a la PQR.
-* ADMIN según reglas del sistema.
+* ADMIN.
+
+La autorización se basa en la relación del usuario con la PQR. Un `AGENT` puede acceder tanto a una PQR creada por él como a una PQR que tenga asignada.
 
 ---
 
@@ -2329,25 +2913,19 @@ Authorization: Bearer TOKEN_ADMIN
 
 ---
 
-##  Respuesta si el USER no es dueño de la PQR
+## Respuesta si el usuario no tiene acceso a la PQR
 
 ```json
 {
-   "message":  "Solo puedes marcar como leído el chat de tus PQR"
-}
-```
-
-----
-
-##  Respuesta si el AGENT no tiene asignada la PQR
-
-```json
-{
-   "message": "Solo puedes marcar como leído el chat de las PQR asignadas a ti"
+   "message": "No tienes permiso para marcar como leído el chat de esta PQR"
 }
 ```
 
 ---
+
+
+---
+
 
 # Enviar mensaje con archivo adjunto en una PQR
 
@@ -2399,9 +2977,12 @@ No se debe agregar manualmente el header `Content-Type`, ya que Postman o el fro
 
 ## Acceso permitido
 
-* USER dueño de la PQR.
+* USER creador de la PQR.
+* AGENT creador de la PQR.
 * AGENT asignado a la PQR.
-* ADMIN según reglas del sistema.
+* ADMIN.
+
+La autorización se basa en la relación del usuario con la PQR. Un `AGENT` puede acceder tanto a una PQR creada por él como a una PQR que tenga asignada.
 
 ---
 
@@ -2602,29 +3183,23 @@ form-data
 
 ---
 
-## Respuesta si el USER no es dueño de la PQR
+## Respuesta si el usuario no tiene acceso a la PQR
 
 ```json
 {
-  "message": "Solo puedes enviar mensajes en las PQR creadas por ti"
+  "message": "No tienes permiso para enviar mensajes en esta PQR"
 }
 ```
 
 ---
 
-## Respuesta si el AGENT no tiene asignada la PQR
-
-```json
-{
-  "message": "Solo puedes enviar mensajes en las PQR asignadas a ti"
-}
-```
 
 ---
+
 
 # Calificar una PQR cerrada
 
-## Endpoint protegido para USER
+## Endpoint protegido para USER / AGENT
 
 ```http
 PATCH /api/pqrs/:id/rate
@@ -2638,7 +3213,9 @@ PATCH /api/pqrs/1/rate
 
 ## Descripción
 
-Endpoint privado encargado de permitir que un usuario califique una PQR creada por él, siempre que la PQR se encuentre en estado `CERRADA`.
+Endpoint privado encargado de permitir que el creador de una PQR la califique, siempre que la PQR se encuentre en estado `CERRADA`.
+
+La autorización se valida por propiedad (`pqr.userId === usuarioAutenticado.id`) y no únicamente por rol. Por esta razón, tanto un `USER` como un `AGENT` pueden calificar una PQR creada por ellos. Un `AGENT` asignado a una PQR ajena no puede calificarla por el solo hecho de estar asignado.
 
 Esta ruta permite registrar una calificación del servicio recibido y, de manera opcional, un comentario sobre la atención brindada.
 
@@ -2647,7 +3224,7 @@ Esta ruta permite registrar una calificación del servicio recibido y, de manera
 ## Header requerido
 
 ```http
-Authorization: Bearer TOKEN_USER
+Authorization: Bearer TOKEN
 Content-Type: application/json
 ```
 
@@ -2655,8 +3232,15 @@ Content-Type: application/json
 
 ## Acceso permitido
 
-* USER
-  
+* USER creador de la PQR.
+* AGENT creador de la PQR.
+
+No tienen permiso para calificar:
+
+* AGENT asignado que no sea el creador.
+* ADMIN que no sea el creador.
+* Cualquier otro usuario que no sea propietario de la PQR.
+
 ---
 
 ## Parámetros
@@ -2707,7 +3291,7 @@ Si la PQR no tiene agente asignado, la notificación solo se genera para los usu
   "message": "PQR calificada correctamente",
   "pqr": {
     "id": 4,
-    "caseType": "OTRO",
+    "caseType": "SAP",
     "description": "La plataforma muestra errores constantes durante el proceso de registro.",
     "status": "CERRADA",
     "createdAt": "2026-05-28T10:30:00.000Z",
@@ -2814,9 +3398,13 @@ Si la PQR no tiene agente asignado, la notificación solo se genera para los usu
 
 ---
 
+
+---
+
+
 # Notificaciones
 
-El backend ahora cuenta con un módulo de notificaciones internas para informar a los usuarios sobre acciones importantes relacionadas con las PQR.
+El backend cuenta con un módulo de notificaciones internas para informar a los usuarios sobre acciones importantes relacionadas con las PQR.
 
 Las notificaciones se guardan en la base de datos y cada usuario autenticado puede consultar únicamente las notificaciones asociadas a su cuenta.
 
@@ -2847,6 +3435,10 @@ PQR_UNASSIGNED
 | PQR_UNASSIGNED  | Se genera cuando un ADMIN retira una PQR a un agente.                                        |
 
 ---
+
+
+---
+
 
 # Obtener notificaciones del usuario autenticado
 
@@ -2915,6 +3507,10 @@ AGENT
 
 ---
 
+
+---
+
+
 # Obtener cantidad de notificaciones no leídas
 
 ## Endpoint protegido
@@ -2968,6 +3564,10 @@ AGENT
 ```
 
 ---
+
+
+---
+
 
 # Marcar una notificación como leída
 
@@ -3047,6 +3647,10 @@ AGENT
 
 ---
 
+
+---
+
+
 # Marcar todas las notificaciones como leídas
 
 ## Endpoint protegido
@@ -3099,63 +3703,74 @@ AGENT
 }
 ```
 
+---
+
 
 ---
 
-# Resumen actualizado de endpoints funcionales
 
-| Método | Endpoint                          | Descripción                                                | Acceso               |
-| ------ | --------------------------------- | ---------------------------------------------------------- | -------------------- |
-| GET    | /api/health                       | Verifica el funcionamiento de la API                       | Público              |
-| GET    | /api/users                        | Obtiene todos los usuarios registrados                     | ADMIN                |
-| POST   | /api/auth/register                | Registra un nuevo usuario                                  | Público              |
-| POST   | /api/auth/register/bulk           | Registra usuarios mediante carga masiva desde Excel        | ADMIN                |
-| POST   | /api/auth/login                   | Inicia sesión y genera token JWT                           | Público              |
-| GET    | /api/profile                      | Obtiene el perfil del usuario autenticado                  | Usuario autenticado  |
-| POST   | /api/pqrs                         | Crea una nueva PQR                                         | USER / ADMIN         |
-| GET    | /api/pqrs/my                      | Obtiene las PQR del usuario autenticado                    | USER / ADMIN         |
-| GET    | /api/pqrs                         | Obtiene todas las PQR del sistema                          | ADMIN                |
-| GET    | /api/pqrs/available               | Obtiene las PQR pendientes sin responsable                 | ADMIN / AGENT        |
-| GET    | /api/pqrs/assigned/my             | Obtiene las PQR asignadas al AGENT autenticado             | ADMIN / AGENT        |
-| PATCH  | /api/pqrs/:id/take                | Permite que un AGENT tome una PQR disponible               | ADMIN / AGENT        |
-| PATCH  | /api/pqrs/:id/status              | Cambia el estado de una PQR                                | ADMIN / AGENT        |
-| PATCH  | /api/users/:id/role               | Cambia el rol de un usuario                                | ADMIN                |
-| PATCH  | /api/pqrs/:id/priority            | Cambia la prioridad de una PQR                             | ADMIN / AGENT        |
-| GET    | /api/pqrs/:id/messages            | Obtiene el historial de mensajes de una PQR                | USER / AGENT / ADMIN |
-| PATCH  | /api/pqrs/:id/messages/read       | Marca como leído el chat de una PQR                        | USER / AGENT         |
-| PATCH  | /api/pqrs/:id/rate                | Permite calificar una PQR cerrada                          | USER                 |
-| GET    | /api/notifications                | Obtiene las notificaciones del usuario autenticado         | USER / ADMIN / AGENT |
-| GET    | /api/notifications/unread-count   | Obtiene la cantidad de notificaciones no leídas            | USER / ADMIN / AGENT |
-| PATCH  | /api/notifications/:id/read       | Marca una notificación como leída                          | USER / ADMIN / AGENT |
-| PATCH  | /api/notifications/read-all       | Marca todas las notificaciones como leídas                 | USER / ADMIN / AGENT |
-| POST   | /api/pqrs/:id/messages/attachment | Envía un mensaje con imagen o documento adjunto en una PQR | USER / AGENT / ADMIN |
-| PATCH  | /api/pqrs/:id/assign              | Asigna o reasigna una PQR a un agente específico           | ADMIN                |
-| PATCH  | /api/pqrs/:id/unassign            | Desasigna una PQR y la deja nuevamente disponible          | ADMIN                |
-| GET    | /api/users/agents                 | Obtiene únicamente los usuarios con rol AGENT              | ADMIN                |
+# Resumen de endpoints funcionales
+
+| Método | Endpoint | Descripción | Acceso |
+| --- | --- | --- | --- |
+| GET | `/api/health` | Verifica el funcionamiento de la API | Público |
+| POST | `/api/auth/register` | Registra un nuevo usuario | Público |
+| POST | `/api/auth/login` | Inicia sesión y genera un token JWT | Público |
+| PATCH | `/api/auth/password` | Cambia la contraseña del usuario autenticado | USER / ADMIN / AGENT |
+| GET | `/api/profile` | Obtiene el perfil del usuario autenticado | USER / ADMIN / AGENT |
+| POST | `/api/users/bulk` | Registra usuarios mediante carga masiva desde Excel | ADMIN |
+| GET | `/api/users` | Obtiene todos los usuarios registrados | ADMIN |
+| GET | `/api/users/agents` | Obtiene los usuarios con rol AGENT | ADMIN |
+| PATCH | `/api/users/:id/role` | Cambia el rol de un usuario | ADMIN |
+| PATCH | `/api/users/:id/password` | Restablece la contraseña de un usuario | ADMIN |
+| GET | `/api/common/identification-types` | Obtiene los tipos de identificación activos | USER / ADMIN / AGENT |
+| POST | `/api/pqrs` | Crea una nueva PQR | USER / AGENT |
+| GET | `/api/pqrs/my` | Obtiene las PQR creadas por el usuario autenticado | USER / AGENT |
+| GET | `/api/pqrs` | Obtiene todas las PQR | ADMIN |
+| GET | `/api/pqrs/available` | Obtiene las PQR disponibles sin responsable | ADMIN / AGENT |
+| GET | `/api/pqrs/assigned/my` | Obtiene las PQR asignadas al agente autenticado | ADMIN / AGENT |
+| PATCH | `/api/pqrs/:id/take` | Permite tomar una PQR disponible | ADMIN / AGENT |
+| PATCH | `/api/pqrs/:id/assign` | Asigna o reasigna una PQR | ADMIN |
+| PATCH | `/api/pqrs/:id/unassign` | Desasigna una PQR | ADMIN |
+| PATCH | `/api/pqrs/:id/status` | Cambia el estado de una PQR | ADMIN / AGENT |
+| PATCH | `/api/pqrs/:id/priority` | Cambia la prioridad de una PQR | ADMIN / AGENT |
+| GET | `/api/pqrs/:id/messages` | Obtiene el historial del chat | USER / AGENT / ADMIN según relación con la PQR |
+| PATCH | `/api/pqrs/:id/messages/read` | Marca el chat como leído | USER / AGENT / ADMIN según relación con la PQR |
+| POST | `/api/pqrs/:id/messages/attachment` | Envía un mensaje con archivo adjunto | USER / AGENT / ADMIN según relación con la PQR |
+| PATCH | `/api/pqrs/:id/rate` | Permite al creador calificar una PQR cerrada | USER / AGENT creador |
+| GET | `/api/notifications` | Obtiene las notificaciones del usuario | USER / ADMIN / AGENT |
+| GET | `/api/notifications/unread-count` | Obtiene la cantidad de notificaciones no leídas | USER / ADMIN / AGENT |
+| PATCH | `/api/notifications/:id/read` | Marca una notificación como leída | USER / ADMIN / AGENT |
+| PATCH | `/api/notifications/read-all` | Marca todas las notificaciones como leídas | USER / ADMIN / AGENT |
 
 ---
 
 # Eventos Socket.IO funcionales
 
-| Evento           | Descripción                                                           | Uso     |
-| ---------------- | --------------------------------------------------------------------- | ------- |
-| connection       | Conecta un usuario autenticado al socket                              | Backend |
-| join_pqr         | Une al usuario a la sala de una PQR                                   | Cliente |
-| joined_pqr       | Confirma que el usuario ingresó al chat                               | Backend |
-| send_pqr_message | Envía un mensaje dentro de una PQR                                    | Cliente |
-| new_pqr_message  | Recibe un nuevo mensaje de texto o con archivo adjunto en tiempo real | Backend |
-| socket_error     | Informa errores de autenticación, permisos o validación               | Backend |
-| disconnect       | Detecta la desconexión del usuario                                    | Backend |
+El módulo de PQR también utiliza Socket.IO para el chat y las actualizaciones en tiempo real.
+
+| Evento | Descripción | Uso |
+| --- | --- | --- |
+| `connection` | Conecta un usuario autenticado al socket | Backend |
+| `join_pqr` | Solicita ingreso a la sala de una PQR | Cliente |
+| `joined_pqr` | Confirma que el usuario ingresó al chat | Backend |
+| `send_pqr_message` | Envía un mensaje de texto dentro de una PQR | Cliente |
+| `new_pqr_message` | Emite un nuevo mensaje de texto o con adjunto | Backend |
+| `socket_error` | Informa errores de autenticación, permisos o validación | Backend |
+| `disconnect` | Detecta la desconexión del usuario | Backend |
+
+La autorización para ingresar a una sala o enviar mensajes depende de la relación del usuario con la PQR.
 
 ---
 
-# Eventos que generan notificaciones
+# Acciones PQR que generan notificaciones
 
-| Acción                          | Quién ejecuta | Quién recibe                          | Tipo de notificación          |
-| Crear una PQR                   | USER          | ADMIN y AGENT                         | NEW_PQR                       |
-| Tomar una PQR                   | AGENT         | ADMIN y USER dueño de la PQR          | PQR_TAKEN                     |
-| Cerrar una PQR                  | ADMIN o AGENT | USER dueño de la PQR                  | PQR_CLOSED                    |
-| Calificar una PQR               | USER          | ADMIN y AGENT asignado                | PQR_RATED                     |
-| Asignar una PQR por primera vez | ADMIN         | AGENT asignado y USER dueño de la PQR | PQR_ASSIGNED / PQR_TAKEN      |
-| Reasignar una PQR               | ADMIN         | Nuevo AGENT y AGENT anterior          | PQR_ASSIGNED / PQR_UNASSIGNED |
-| Desasignar una PQR              | ADMIN         | AGENT retirado                        | PQR_UNASSIGNED                |
+| Acción | Ejecutada por | Destinatario | Tipo |
+| --- | --- | --- | --- |
+| Crear una PQR | USER o AGENT | ADMIN y AGENT | `NEW_PQR` |
+| Tomar una PQR | AGENT | ADMIN y creador de la PQR | `PQR_TAKEN` |
+| Cerrar una PQR | ADMIN o AGENT autorizado | Creador de la PQR | `PQR_CLOSED` |
+| Calificar una PQR | USER o AGENT creador | ADMIN y AGENT asignado | `PQR_RATED` |
+| Asignar una PQR por primera vez | ADMIN | AGENT asignado y creador | `PQR_ASSIGNED` / `PQR_TAKEN` |
+| Reasignar una PQR | ADMIN | Nuevo AGENT y AGENT anterior | `PQR_ASSIGNED` / `PQR_UNASSIGNED` |
+| Desasignar una PQR | ADMIN | AGENT retirado | `PQR_UNASSIGNED` |
