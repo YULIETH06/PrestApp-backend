@@ -240,7 +240,7 @@ export const registerUsersBulkService = async (
             rowErrors.push({
                 column: "rol",
                 message:
-                    "Rol no válido. Los roles permitidos son USER, ADMIN y AGENT",
+                    "Rol no válido. Los roles permitidos son USER y ADMIN",
             });
         }
 

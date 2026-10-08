@@ -4,7 +4,6 @@ import {
 
 import {
   getUsers,
-  getAgents,
   updateUserRole,
   resetUserPassword,
 } from "../../controllers/users/user.controller.js";
@@ -26,13 +25,6 @@ router.get(
   authMiddleware,
   roleMiddleware(["ADMIN"]),
   getUsers
-);
-
-router.get(
-  "/agents",
-  authMiddleware,
-  roleMiddleware(["ADMIN"]),
-  getAgents
 );
 
 // Registra usuarios mediante carga masiva desde archivo Excel.

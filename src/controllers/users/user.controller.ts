@@ -7,7 +7,6 @@ import {
   getAllUsersService,
   getUserByIdService,
   updateUserRoleService,
-  getAgentsService,
   resetUserPasswordService,
 } from "../../services/users/user.service.js";
 
@@ -28,27 +27,6 @@ export const getUsers = async (
     return res.status(500).json({
       message:
         "Error al obtener los usuarios",
-    });
-  }
-};
-
-export const getAgents = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const agents =
-      await getAgentsService();
-
-    return res.status(200).json({
-      message:
-        "Agentes obtenidos correctamente",
-      agents,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      message:
-        "Error al obtener los agentes",
     });
   }
 };
@@ -88,7 +66,6 @@ export const updateUserRole = async (
     const allowedRoles = [
       "USER",
       "ADMIN",
-      "AGENT",
     ];
 
     if (!allowedRoles.includes(role)) {

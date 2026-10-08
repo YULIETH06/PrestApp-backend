@@ -2,9 +2,7 @@ import { Router } from "express";
 
 import userRoutes from "./users/user.routes.js";
 import profileRoutes from "./users/profile.routes.js";
-import pqrRoutes from "./pqrs/pqr.routes.js";
 import authRoutes from "./auth/auth.routes.js";
-import pqrMessageRoutes from "./pqrs/pqrMessage.routes.js";
 import notificationRoutes from "./notifications/notification.routes.js";
 
 import identificationTypeRoutes from "./common/identificationType.routes.js";
@@ -21,10 +19,6 @@ router.get("/health", (req, res) => {
 router.use("/users", userRoutes);
 router.use("/profile", profileRoutes);
 router.use("/auth", authRoutes);
-
-// PQR.
-router.use("/pqrs", pqrRoutes);
-router.use("/", pqrMessageRoutes);
 
 // Notificaciones.
 router.use("/notifications", notificationRoutes);
