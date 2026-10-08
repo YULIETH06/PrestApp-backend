@@ -1,17 +1,26 @@
-# Documentación Técnica
+# Documentación Técnica del Backend — Presta App
 
 ## Descripción
 
-Documentación técnica inicial del backend desarrollado con Node.js, Express y TypeScript.
+Este documento describe la arquitectura actual del backend de **Presta App** después de la migración a la nueva estructura modular.
 
-El backend permite gestionar usuarios, autenticación mediante JWT, roles, carga masiva de usuarios, creación y administración de PQR, asignación de agentes, cambio de estado, prioridad, calificación de PQR cerradas y chat en tiempo real para el seguimiento de cada solicitud mediante Socket.IO.
+El backend está desarrollado con **Node.js, Express, TypeScript, Prisma, MySQL, JWT y Socket.IO**.
+
+Actualmente el backend está organizado en los siguientes módulos:
+
+- Autenticación.
+- Usuarios.
+- PQR.
+- Notificaciones.
+- Catálogo común de tipos de identificación.
+- Chat de PQR en tiempo real.
 
 ---
 
-# Estructura general del backend
+# Estructura general
 
 ```txt
-backend-inc/
+PrestApp-backend/
 │
 ├── docs/
 ├── node_modules/
@@ -27,130 +36,128 @@ backend-inc/
 └── tsconfig.json
 ```
 
----
-
-# Descripción de la estructura
-
-| Archivo / Carpeta    | Descripción                                                |
-| -------------------- | ---------------------------------------------------------- |
-| docs                 | Documentación técnica del proyecto                         |
-| node_modules         | Dependencias instaladas del proyecto                       |
-| prisma               | Configuración de Prisma y migraciones                      |
-| prisma/migrations    | Historial de migraciones de base de datos                  |
-| prisma/schema.prisma | Definición de modelos, enums, relaciones y conexión Prisma |
-| src                  | Código fuente principal del backend                        |
-| .env                 | Variables de entorno                                       |
-| .gitignore           | Archivos ignorados por Git                                 |
-| package.json         | Dependencias y scripts del proyecto                        |
-| package-lock.json    | Control de versiones exactas de dependencias               |
-| prisma.config.ts     | Configuración personalizada de Prisma                      |
-| tsconfig.json        | Configuración de TypeScript                                |
+| Archivo / Carpeta | Descripción |
+| --- | --- |
+| `docs/` | Documentación técnica del backend |
+| `prisma/` | Configuración, esquema y migraciones de Prisma |
+| `prisma/migrations/` | Historial de cambios de base de datos |
+| `prisma/schema.prisma` | Modelos, enums y relaciones de la base de datos |
+| `src/` | Código fuente del backend |
+| `.env` | Variables de entorno |
+| `package.json` | Dependencias y scripts |
+| `prisma.config.ts` | Configuración de Prisma |
+| `tsconfig.json` | Configuración de TypeScript |
 
 ---
 
-# Estructura interna de src
-
-Se organizó la estructura principal del backend dentro de la carpeta `src` para separar responsabilidades y mantener una arquitectura escalable.
-
-### Estructura
+# Estructura interna de `src`
 
 ```txt
 src/
 │
-├── server.ts
 ├── app.ts
+├── server.ts
 │
 ├── config/
 │   ├── client.ts
 │   └── socket.ts
 │
 ├── controllers/
-│   ├── auth
-│   |   └── auth.controller.ts
-│   ├── notifications
-│   |   └── notification.controller.ts
-│   ├── pqrs
-|   |   ├── pqr.controller.ts
-│   |   └── pqrMessage.controller.ts
-│   └── users
+│   ├── auth/
+│   │   └── auth.controller.ts
+│   ├── common/
+│   │   └── identificationType.controller.ts
+│   ├── notifications/
+│   │   └── notification.controller.ts
+│   ├── pqrs/
+│   │   ├── pqr.controller.ts
+│   │   └── pqrMessage.controller.ts
+│   └── users/
 │       ├── profile.controller.ts
-|       └─ user.controller.ts
-|
+│       ├── user.controller.ts
+│       └── userBulk.controller.ts
+│
+├── helpers/
+│
 ├── interfaces/
-│   ├── auth
-│   |   └── auth.interface.ts
-│   ├── notifications
-│   |   └── notification.interface.ts
-│   ├── pqrs
-|   |   ├── pqr.interface.ts
-│   |   └── pqrMessage.interface.ts
-│   └── sockets
-|       └─ socket.interface.ts
+│   ├── auth/
+│   │   └── auth.interface.ts
+│   ├── notifications/
+│   │   └── notification.interface.ts
+│   ├── pqrs/
+│   │   ├── pqr.interface.ts
+│   │   └── pqrMessage.interface.ts
+│   ├── sockets/
+│   │   └── socket.interface.ts
+│   └── users/
+│       └── userBulk.interface.ts
 │
 ├── middlewares/
-│   ├── auth.middleware.ts
-│   ├── role.middleware.ts
-│   ├── socketAuth.middleware.ts
-│   └── upload.middleware.ts
+│   ├── auth/
+│   │   ├── auth.middleware.ts
+│   │   ├── role.middleware.ts
+│   │   └── socketAuth.middleware.ts
+│   ├── errors/
+│   ├── uploads/
+│   │   └── pqrs/
+│   │       └── pqrAttachmentUpload.middleware.ts
+│   ├── validation/
+│   └── index.ts
 │
 ├── routes/
-│   ├── auth
-│   |   └── auth.routes.ts
-│   ├── notifications
-│   |   └── notification.routes.ts
-│   ├── pqrs
-|   |   ├── pqr.routes.ts
-│   |   └── pqrMessage.routes.ts
-│   ├── users
-|   |   ├── profile.routes.ts
-|   |   └── user.routes.ts
+│   ├── auth/
+│   │   └── auth.routes.ts
+│   ├── common/
+│   │   └── identificationType.routes.ts
+│   ├── notifications/
+│   │   └── notification.routes.ts
+│   ├── pqrs/
+│   │   ├── pqr.routes.ts
+│   │   └── pqrMessage.routes.ts
+│   ├── users/
+│   │   ├── profile.routes.ts
+│   │   └── user.routes.ts
 │   └── index.ts
 │
 ├── services/
-│   ├── auth
-│   |   └── auth.service.ts
-│   ├── notifications
-│   |   └── notification.service.ts
-│   ├── pqrs
-|   |   ├── pqr.service.ts
-|   |   ├── pqrAttachment.service.ts
-│   |   └── pqrMessage.service.ts
-│   └── users
-|       └─ user.service.ts
+│   ├── auth/
+│   │   └── auth.service.ts
+│   ├── common/
+│   │   └── identificationType.service.ts
+│   ├── notifications/
+│   │   ├── pqrs/
+│   │   │   └── pqrNotification.service.ts
+│   │   └── notification.service.ts
+│   ├── pqrs/
+│   │   ├── pqr.service.ts
+│   │   ├── pqrAttachment.service.ts
+│   │   └── pqrMessage.service.ts
+│   └── users/
+│       ├── user.service.ts
+│       └── userBulk.service.ts
 │
 ├── sockets/
-│   ├── index.socket.ts
-│   ├── notification.socket.ts
-│   └── pqr.socket.ts
+│   ├── notifications/
+│   │   └── notification.socket.ts
+│   ├── pqrs/
+│   │   └── pqr.socket.ts
+│   └── index.socket.ts
 │
-└── Utils/
+└── utils/
     └── validators.ts
 ```
 
 ---
 
-# Descripción de carpetas
-
-| Carpeta     | Descripción                                                                         |
-| ----------- | ----------------------------------------------------------------------------------- |
-| config      | Configuraciones generales del proyecto, cliente Prisma y configuración de Socket.IO |
-| controllers | Controladores de las peticiones HTTP                                                |
-| interfaces  | Interfaces y tipados TypeScript reutilizables                                       |
-| middlewares | Middlewares personalizados para autenticación y validaciones                        |
-| routes      | Definición y agrupación de rutas de la API                                          |
-| services    | Lógica de negocio y conexión con Prisma                                             |
-| sockets     | Eventos de Socket.IO para funcionalidades en tiempo real                            |
-| utils       | Funciones reutilizables                                                             |
-
----
-
 # Arquitectura utilizada
+
+Para peticiones HTTP:
 
 ```txt
 Route -> Controller -> Service -> Prisma
 ```
 
-Para la funcionalidad de chat en tiempo real se utiliza la siguiente arquitectura:
+Para funcionalidades en tiempo real:
 
 ```txt
 Socket.IO -> Socket Middleware JWT -> Socket Event -> Service -> Prisma
@@ -158,61 +165,120 @@ Socket.IO -> Socket Middleware JWT -> Socket Event -> Service -> Prisma
 
 ---
 
+# Responsabilidad de carpetas
+
+| Carpeta | Responsabilidad |
+| --- | --- |
+| `config` | Prisma Client y Socket.IO |
+| `controllers` | Recibir solicitudes HTTP y construir respuestas |
+| `interfaces` | Tipos TypeScript reutilizables |
+| `middlewares` | Autenticación, roles y carga de archivos |
+| `routes` | Definición y agrupación de endpoints |
+| `services` | Lógica de negocio y acceso a Prisma |
+| `sockets` | Eventos en tiempo real |
+| `utils` | Funciones reutilizables y validaciones |
+
+---
+
+# Organización por módulos
+
+## Autenticación
+
+Responsabilidades principales:
+
+- Registro individual.
+- Login.
+- Generación y validación de JWT.
+- Cambio de contraseña del usuario autenticado.
+
+## Usuarios
+
+Responsabilidades principales:
+
+- Obtener usuarios.
+- Obtener agentes.
+- Cambiar roles.
+- Restablecer contraseña desde administración.
+- Carga masiva mediante Excel.
+
+La carga masiva se mantiene dentro de `users`:
+
+```txt
+routes/users/user.routes.ts
+    ↓
+controllers/users/userBulk.controller.ts
+    ↓
+services/users/userBulk.service.ts
+    ↓
+Prisma
+```
+
+## PQR
+
+Responsabilidades principales:
+
+- Crear solicitudes.
+- Consultar PQR propias, disponibles, asignadas y administrativas.
+- Asignar, reasignar agentes.
+- Cambiar estado y prioridad.
+- Calificar solicitudes cerradas.
+- Administrar chat, lectura y adjuntos.
+
+## Notificaciones
+
+Responsabilidades principales:
+
+- Crear notificaciones derivadas del flujo de PQR.
+- Consultar notificaciones del usuario autenticado.
+- Consultar cantidad de no leídas.
+- Marcar una o todas como leídas.
+- Emitir nuevas notificaciones mediante Socket.IO.
+
+## Common
+
+Actualmente conserva únicamente el catálogo:
+
+```txt
+IdentificationType
+```
+
+Su endpoint permite consultar tipos de identificación activos.
+
+---
+
 # Archivos principales
 
-## src/app.ts
+## `src/app.ts`
 
-Archivo encargado de:
+Encargado de:
 
-* Inicializar Express.
-* Configurar middlewares.
-* Configurar CORS.
-* Registrar rutas.
-* Exportar la aplicación.
+- Inicializar Express.
+- Configurar middlewares.
+- Configurar CORS.
+- Registrar rutas.
+- Servir recursos necesarios.
+- Exportar la aplicación.
 
----
+## `src/server.ts`
 
-## src/server.ts
+Encargado de:
 
-Archivo principal encargado de:
+- Crear el servidor HTTP.
+- Inicializar Socket.IO.
+- Definir el puerto.
+- Levantar el backend.
 
-* Importar la aplicación.
-* Crear el servidor HTTP.
-* Definir puerto.
-* Inicializar Socket.IO.
-* Levantar el servidor.
+## `src/config/client.ts`
 
----
+Crea y exporta la instancia de Prisma Client.
 
-## src/config/client.ts
+## `src/config/socket.ts`
 
-Archivo encargado de crear y exportar la instancia de Prisma Client.
-
-
----
-
-## src/config/socket.ts
-
-Archivo encargado de inicializar Socket.IO dentro del servidor HTTP.
-
-Funciones principales:
-
-* Crear la instancia de Socket.IO.
-* Configurar CORS para permitir conexión desde el frontend.
-* Aplicar el middleware de autenticación por JWT para sockets.
-* Registrar los eventos del chat de PQR.
+Inicializa Socket.IO, configura autenticación JWT para sockets y registra los eventos del sistema.
 
 ---
 
 # Variables de entorno
-
-## Archivo
-
-```txt
-.env
-```
-
-## Variables
 
 ```env
 PORT=4000
@@ -220,26 +286,26 @@ DATABASE_URL=
 JWT_SECRET=
 ```
 
-## Descripción
-
-| Variable     | Descripción                                               |
-| ------------ | --------------------------------------------------------- |
-| PORT         | Puerto donde se ejecuta el backend                        |
-| DATABASE_URL | URL de conexión a MySQL utilizada por Prisma              |
-| JWT_SECRET   | Clave secreta utilizada para generar y validar tokens JWT |
+| Variable | Descripción |
+| --- | --- |
+| `PORT` | Puerto del backend |
+| `DATABASE_URL` | URL de conexión MySQL usada por Prisma |
+| `JWT_SECRET` | Clave para firmar y validar JWT |
 
 ---
 
-# Configuración de Prisma
+# Base de datos
 
-## Archivo `schema.prisma`
+El backend utiliza **MySQL** mediante Prisma.
 
-El archivo `schema.prisma` define:
+El esquema actual contiene los modelos:
 
-* El proveedor de base de datos.
-* Los modelos de Prisma.
-* Los enums.
-* Las relaciones entre tablas.
-* La generación del cliente Prisma.
-
----
+```txt
+IdentificationType
+User
+PQR
+PqrMessage
+PqrChatRead
+PqrMessageAttachment
+Notification
+```

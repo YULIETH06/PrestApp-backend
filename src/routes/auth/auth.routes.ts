@@ -1,23 +1,34 @@
 import { Router } from "express";
+
 import {
+  changePassword,
+  loginUser,
   registerUser,
-  registerUsersBulk,
 } from "../../controllers/auth/auth.controller.js";
-import { uploadExcel } from "../../middlewares/upload.middleware.js";
-import { authMiddleware } from "../../middlewares/auth.middleware.js";
-import { roleMiddleware } from "../../middlewares/role.middleware.js";
+
+import {
+  authMiddleware,
+} from "../../middlewares/index.js";
 
 const router = Router();
 
-router.post("/register", registerUser);
-
-// Registra usuarios mediante carga masiva desde archivo Excel.
+// Registra un usuario individual.
 router.post(
-  "/register/bulk",
+  "/register",
+  registerUser
+);
+
+// Autentica un usuario y genera su token de acceso.
+router.post(
+  "/login",
+  loginUser
+);
+
+// Cambia la contraseña del usuario autenticado.
+router.patch(
+  "/password",
   authMiddleware,
-  roleMiddleware(["ADMIN"]),
-  uploadExcel.single("file"),
-  registerUsersBulk
+  changePassword
 );
 
 export default router;

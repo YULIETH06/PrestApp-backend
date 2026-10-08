@@ -10,33 +10,6 @@ datasource db {
 enum Role {
   USER
   ADMIN
-  AGENT
-}
-
-enum PqrStatus {
-  PENDIENTE
-  EN_PROCESO
-  CERRADA
-}
-
-enum PqrCaseType {
-  SAP
-  BEAS
-  TERMINAL
-  CORREO
-  INTRANET
-  SOPORTE_EQUIPOS
-  SOPORTE_RED
-  MI_PORTAL_SAP
-  LEGALISAPP
-  NUEVAS_SOLICITUDES
-}
-
-enum PqrPriority {
-  BAJA
-  MEDIA
-  ALTA
-  URGENTE
 }
 
 enum NotificationType {
@@ -50,9 +23,14 @@ enum NotificationType {
   PQR_UNASSIGNED
 }
 
-enum PqrAttachmentType {
-  IMAGE
-  DOCUMENT
+model IdentificationType {
+  id       Int     @id @default(autoincrement())
+  code     String  @unique @db.VarChar(20)
+  name     String  @unique @db.VarChar(100)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model User {
@@ -62,77 +40,10 @@ model User {
   password String
   role     Role   @default(USER)
 
-  pqrsCreated  PQR[] @relation("UserPqrs")
-  pqrsAssigned PQR[] @relation("AgentPqrs")
-
-  pqrMessages   PqrMessage[]
-  notifications Notification[]
-  pqrChatReads  PqrChatRead[]
-}
-
-model PQR {
-  id          Int         @id @default(autoincrement())
-  caseType    PqrCaseType
-  description String      @db.VarChar(500)
-  status      PqrStatus   @default(PENDIENTE)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  userId Int
-  user   User @relation("UserPqrs", fields: [userId], references: [id])
-
-  assignedToId Int?
-  assignedTo   User? @relation("AgentPqrs", fields: [assignedToId], references: [id])
-
-  priority PqrPriority?
-
-  rating        Int?
-  ratingComment String?   @db.VarChar(300)
-  ratedAt       DateTime?
-
-  messages      PqrMessage[]
-  notifications Notification[]
-  chatReads     PqrChatRead[]
-}
-
-model PqrMessage {
-  id        Int      @id @default(autoincrement())
-  content   String?  @db.VarChar(500)
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-  pqrId Int
-  pqr   PQR @relation(fields: [pqrId], references: [id], onDelete: Cascade)
-
-  senderId Int
-  sender   User @relation(fields: [senderId], references: [id])
-
-  attachments PqrMessageAttachment[]
-}
-
-model PqrChatRead {
-  id         Int      @id @default(autoincrement())
-  pqrId      Int
-  userId     Int
-  lastReadAt DateTime @default(now())
-
-  pqr  PQR  @relation(fields: [pqrId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([pqrId, userId])
-}
-
-model PqrMessageAttachment {
-  id           Int               @id @default(autoincrement())
-  fileName     String
-  originalName String
-  fileUrl      String
-  fileType     PqrAttachmentType
-  mimeType     String
-  fileSize     Int
-  createdAt    DateTime          @default(now())
-
-  messageId Int
-  message   PqrMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  notifications Notification[]
 }
 
 model Notification {
@@ -146,5 +57,4 @@ model Notification {
   createdAt DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id])
-  pqr  PQR? @relation(fields: [pqrId], references: [id])
 }

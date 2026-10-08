@@ -1,5 +1,10 @@
+import bcrypt from "bcryptjs";
+
 import prisma from "../../config/client.js";
-import { Role } from "@prisma/client";
+
+import {
+    Role,
+} from "@prisma/client";
 
 export const getAllUsersService = async () => {
     const users = await prisma.user.findMany({
@@ -17,10 +22,16 @@ export const getAllUsersService = async () => {
     return users;
 };
 
-export const getUserByIdService = async (id: number) => {
+// Consulta la existencia de un usuario mediante su identificador.
+export const getUserByIdService = async (
+    id: number
+) => {
     const user = await prisma.user.findUnique({
         where: {
             id,
+        },
+        select: {
+            id: true,
         },
     });
 
@@ -49,13 +60,47 @@ export const updateUserRoleService = async (
     return user;
 };
 
-export const getAgentsService = async () => {
-    const agents = await prisma.user.findMany({
+// Restablece la contraseña de un usuario desde la administración.
+export const resetUserPasswordService = async (
+    userId: number,
+    newPassword: string
+) => {
+    const user = await prisma.user.findUnique({
         where: {
-            role: Role.AGENT,
+            id: userId,
         },
-        orderBy: {
-            name: "asc",
+        select: {
+            id: true,
+            password: true,
+        },
+    });
+
+    if (!user) {
+        return null;
+    }
+
+    const isSamePassword = await bcrypt.compare(
+        newPassword,
+        user.password
+    );
+
+    if (isSamePassword) {
+        throw new Error(
+            "La nueva contraseña debe ser diferente a la contraseña actual"
+        );
+    }
+
+    const hashedPassword = await bcrypt.hash(
+        newPassword,
+        10
+    );
+
+    const updatedUser = await prisma.user.update({
+        where: {
+            id: userId,
+        },
+        data: {
+            password: hashedPassword,
         },
         select: {
             id: true,
@@ -65,5 +110,5 @@ export const getAgentsService = async () => {
         },
     });
 
-    return agents;
+    return updatedUser;
 };
