@@ -13,14 +13,7 @@ enum Role {
 }
 
 enum NotificationType {
-  NEW_PQR
-  STATUS_CHANGE
-  PRIORITY_CHANGE
-  PQR_CLOSED
-  PQR_RATED
-  PQR_TAKEN
-  PQR_ASSIGNED
-  PQR_UNASSIGNED
+  GENERAL
 }
 
 model IdentificationType {
@@ -50,10 +43,9 @@ model Notification {
   id        Int              @id @default(autoincrement())
   title     String
   message   String
-  type      NotificationType
+  type      NotificationType @default(GENERAL)
   isRead    Boolean          @default(false)
   userId    Int
-  pqrId     Int?
   createdAt DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id])

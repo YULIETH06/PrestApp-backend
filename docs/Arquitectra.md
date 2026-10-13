@@ -1,23 +1,30 @@
-# Documentación Técnica del Backend — Presta App
+# Arquitectura del backend
 
 ## Descripción
 
-Este documento describe la arquitectura actual del backend de **Presta App** después de la migración a la nueva estructura modular.
-
-El backend está desarrollado con **Node.js, Express, TypeScript, Prisma, MySQL, JWT y Socket.IO**.
-
-Actualmente el backend está organizado en los siguientes módulos:
-
-- Autenticación.
-- Usuarios.
-- PQR.
-- Notificaciones.
-- Catálogo común de tipos de identificación.
-- Chat de PQR en tiempo real.
+Este documento describe la arquitectura del backend de PrestApp: tecnologías utilizadas, organización de carpetas y archivos, recorrido de una petición, autenticación, notificaciones en tiempo real y la forma de agregar módulos nuevos.
 
 ---
 
-# Estructura general
+# Tecnologías utilizadas
+
+| Tecnología | Uso dentro del proyecto |
+|---|---|
+| Node.js | Entorno de ejecución |
+| Express 5 | Servidor HTTP y rutas de la API |
+| TypeScript | Tipado del código. El proyecto usa módulos ES, por eso los imports terminan en `.js` |
+| Prisma 6 | ORM para trabajar con la base de datos |
+| MySQL | Base de datos |
+| jsonwebtoken | Generación y validación de tokens JWT |
+| bcryptjs | Encriptación de contraseñas |
+| Socket.IO | Notificaciones en tiempo real |
+| Multer | Recepción de archivos en las peticiones |
+| XLSX | Lectura de archivos Excel (carga masiva de usuarios) |
+| tsx | Ejecución del servidor en desarrollo con reinicio automático |
+
+---
+
+# Estructura general del backend
 
 ```txt
 PrestApp-backend/
@@ -36,27 +43,36 @@ PrestApp-backend/
 └── tsconfig.json
 ```
 
+---
+
+# Descripción de la estructura
+
 | Archivo / Carpeta | Descripción |
-| --- | --- |
-| `docs/` | Documentación técnica del backend |
-| `prisma/` | Configuración, esquema y migraciones de Prisma |
-| `prisma/migrations/` | Historial de cambios de base de datos |
-| `prisma/schema.prisma` | Modelos, enums y relaciones de la base de datos |
-| `src/` | Código fuente del backend |
-| `.env` | Variables de entorno |
+|---|---|
+| `docs` | Documentación técnica del backend |
+| `node_modules` | Dependencias instaladas (no se sube a git) |
+| `prisma` | Configuración de Prisma y migraciones |
+| `prisma/migrations` | Historial de cambios de la base de datos |
+| `prisma/schema.prisma` | Modelos, enums, relaciones y conexión a la base de datos |
+| `src` | Código fuente del backend |
+| `.env` | Variables de entorno (no se sube a git) |
+| `.gitignore` | Archivos y carpetas que git no debe seguir |
 | `package.json` | Dependencias y scripts |
-| `prisma.config.ts` | Configuración de Prisma |
+| `package-lock.json` | Versiones exactas de las dependencias instaladas |
+| `prisma.config.ts` | Configuración de Prisma (carga el `.env` y la ruta del schema) |
 | `tsconfig.json` | Configuración de TypeScript |
 
 ---
 
-# Estructura interna de `src`
+# Estructura interna de src
+
+El código se organiza **por capa** (routes, controllers, services…) y dentro de cada capa **por módulo** (auth, users, notifications, common). Así, todo lo de un módulo tiene el mismo nombre de carpeta en cada capa.
 
 ```txt
 src/
 │
-├── app.ts
 ├── server.ts
+├── app.ts
 │
 ├── config/
 │   ├── client.ts
@@ -69,24 +85,16 @@ src/
 │   │   └── identificationType.controller.ts
 │   ├── notifications/
 │   │   └── notification.controller.ts
-│   ├── pqrs/
-│   │   ├── pqr.controller.ts
-│   │   └── pqrMessage.controller.ts
 │   └── users/
 │       ├── profile.controller.ts
 │       ├── user.controller.ts
 │       └── userBulk.controller.ts
-│
-├── helpers/
 │
 ├── interfaces/
 │   ├── auth/
 │   │   └── auth.interface.ts
 │   ├── notifications/
 │   │   └── notification.interface.ts
-│   ├── pqrs/
-│   │   ├── pqr.interface.ts
-│   │   └── pqrMessage.interface.ts
 │   ├── sockets/
 │   │   └── socket.interface.ts
 │   └── users/
@@ -97,11 +105,10 @@ src/
 │   │   ├── auth.middleware.ts
 │   │   ├── role.middleware.ts
 │   │   └── socketAuth.middleware.ts
-│   ├── errors/
 │   ├── uploads/
-│   │   └── pqrs/
-│   │       └── pqrAttachmentUpload.middleware.ts
-│   ├── validation/
+│   │   └── excelUpload.middleware.ts
+│   ├── errors/          (vacía)
+│   ├── validation/      (vacía)
 │   └── index.ts
 │
 ├── routes/
@@ -111,9 +118,6 @@ src/
 │   │   └── identificationType.routes.ts
 │   ├── notifications/
 │   │   └── notification.routes.ts
-│   ├── pqrs/
-│   │   ├── pqr.routes.ts
-│   │   └── pqrMessage.routes.ts
 │   ├── users/
 │   │   ├── profile.routes.ts
 │   │   └── user.routes.ts
@@ -125,13 +129,7 @@ src/
 │   ├── common/
 │   │   └── identificationType.service.ts
 │   ├── notifications/
-│   │   ├── pqrs/
-│   │   │   └── pqrNotification.service.ts
 │   │   └── notification.service.ts
-│   ├── pqrs/
-│   │   ├── pqr.service.ts
-│   │   ├── pqrAttachment.service.ts
-│   │   └── pqrMessage.service.ts
 │   └── users/
 │       ├── user.service.ts
 │       └── userBulk.service.ts
@@ -139,173 +137,306 @@ src/
 ├── sockets/
 │   ├── notifications/
 │   │   └── notification.socket.ts
-│   ├── pqrs/
-│   │   └── pqr.socket.ts
 │   └── index.socket.ts
+│
+├── helpers/             (vacía)
 │
 └── utils/
     └── validators.ts
 ```
 
+> Las carpetas `helpers`, `middlewares/errors` y `middlewares/validation` están vacías. Quedan reservadas para el manejador de errores y validaciones que se agreguen más adelante. Git no guarda carpetas vacías, así que pueden no aparecer al clonar el proyecto.
+
+---
+
+# Descripción de carpetas
+
+| Carpeta | Descripción |
+|---|---|
+| `config` | Instancia de Prisma y configuración de Socket.IO |
+| `routes` | Define las URL de cada módulo y qué middlewares y controlador usa cada una |
+| `controllers` | Reciben la petición, validan los datos de entrada y deciden la respuesta HTTP |
+| `services` | Lógica de negocio y consultas a la base de datos con Prisma |
+| `middlewares` | Funciones que se ejecutan antes del controlador: autenticación, roles y carga de archivos |
+| `interfaces` | Tipos de TypeScript compartidos por módulo |
+| `sockets` | Eventos de Socket.IO organizados por funcionalidad |
+| `helpers` | Funciones de apoyo específicas de un proceso de negocio (vacía por ahora) |
+| `utils` | Funciones genéricas reutilizables en cualquier módulo |
+
+---
+
+# Módulos actuales
+
+| Módulo | Qué hace | Archivos |
+|---|---|---|
+| `auth` | Registro, login y cambio de contraseña propia | route, controller, service, interface |
+| `users` | Perfil, administración de usuarios y carga masiva desde Excel | 2 routes, 3 controllers, 2 services, 1 interface |
+| `notifications` | Notificaciones por usuario (HTTP y tiempo real) | route, controller, service, interface, socket |
+| `common` | Catálogos compartidos: tipos de identificación | route, controller, service |
+
+Las rutas de cada módulo están documentadas en `Endpoints.md`.
+
 ---
 
 # Arquitectura utilizada
 
-Para peticiones HTTP:
+## Peticiones HTTP
 
 ```txt
-Route -> Controller -> Service -> Prisma
+Route → Middlewares → Controller → Service → Prisma → MySQL
 ```
 
-Para funcionalidades en tiempo real:
+| Capa | Responsabilidad | Ejemplo |
+|---|---|---|
+| Route | Define método, URL, middlewares y controlador | `router.patch("/:id/role", authMiddleware, roleMiddleware(["ADMIN"]), updateUserRole)` |
+| Middleware | Verifica token, rol o archivo antes de continuar | `authMiddleware` |
+| Controller | Lee `req`, valida datos de entrada y responde con el código adecuado | `updateUserRole` valida el `id` y el `role` |
+| Service | Aplica reglas de negocio y consulta la base de datos | `updateUserRoleService` actualiza el usuario |
+
+Reglas que se siguen:
+
+* **El controlador no consulta la base de datos directamente**; llama a un servicio.
+* **El servicio no conoce `req` ni `res`**; recibe datos y devuelve resultados o lanza errores.
+* Las respuestas siempre incluyen un campo `message`.
+
+## Notificaciones en tiempo real
 
 ```txt
-Socket.IO -> Socket Middleware JWT -> Socket Event -> Service -> Prisma
+Cliente Socket.IO → socketAuthMiddleware (JWT) → conexión → sala user_<id>
+Service → createNotificationService → guarda en MySQL → emite new_notification a la sala
 ```
-
----
-
-# Responsabilidad de carpetas
-
-| Carpeta | Responsabilidad |
-| --- | --- |
-| `config` | Prisma Client y Socket.IO |
-| `controllers` | Recibir solicitudes HTTP y construir respuestas |
-| `interfaces` | Tipos TypeScript reutilizables |
-| `middlewares` | Autenticación, roles y carga de archivos |
-| `routes` | Definición y agrupación de endpoints |
-| `services` | Lógica de negocio y acceso a Prisma |
-| `sockets` | Eventos en tiempo real |
-| `utils` | Funciones reutilizables y validaciones |
-
----
-
-# Organización por módulos
-
-## Autenticación
-
-Responsabilidades principales:
-
-- Registro individual.
-- Login.
-- Generación y validación de JWT.
-- Cambio de contraseña del usuario autenticado.
-
-## Usuarios
-
-Responsabilidades principales:
-
-- Obtener usuarios.
-- Obtener agentes.
-- Cambiar roles.
-- Restablecer contraseña desde administración.
-- Carga masiva mediante Excel.
-
-La carga masiva se mantiene dentro de `users`:
-
-```txt
-routes/users/user.routes.ts
-    ↓
-controllers/users/userBulk.controller.ts
-    ↓
-services/users/userBulk.service.ts
-    ↓
-Prisma
-```
-
-## PQR
-
-Responsabilidades principales:
-
-- Crear solicitudes.
-- Consultar PQR propias, disponibles, asignadas y administrativas.
-- Asignar, reasignar agentes.
-- Cambiar estado y prioridad.
-- Calificar solicitudes cerradas.
-- Administrar chat, lectura y adjuntos.
-
-## Notificaciones
-
-Responsabilidades principales:
-
-- Crear notificaciones derivadas del flujo de PQR.
-- Consultar notificaciones del usuario autenticado.
-- Consultar cantidad de no leídas.
-- Marcar una o todas como leídas.
-- Emitir nuevas notificaciones mediante Socket.IO.
-
-## Common
-
-Actualmente conserva únicamente el catálogo:
-
-```txt
-IdentificationType
-```
-
-Su endpoint permite consultar tipos de identificación activos.
 
 ---
 
 # Archivos principales
 
-## `src/app.ts`
+## src/server.ts
 
-Encargado de:
+Punto de entrada del backend. Se encarga de:
 
-- Inicializar Express.
-- Configurar middlewares.
-- Configurar CORS.
-- Registrar rutas.
-- Servir recursos necesarios.
-- Exportar la aplicación.
+* Importar la aplicación de Express.
+* Crear el servidor HTTP.
+* Inicializar Socket.IO sobre ese servidor.
+* Escuchar en el puerto definido en `PORT` (por defecto `4000`).
 
-## `src/server.ts`
+---
 
-Encargado de:
+## src/app.ts
 
-- Crear el servidor HTTP.
-- Inicializar Socket.IO.
-- Definir el puerto.
-- Levantar el backend.
+Configura la aplicación de Express:
 
-## `src/config/client.ts`
+* Habilita CORS.
+* Permite recibir JSON en el cuerpo de las peticiones.
+* Publica la carpeta `uploads/` en la URL `/uploads`.
+* Registra todas las rutas bajo el prefijo `/api`.
 
-Crea y exporta la instancia de Prisma Client.
+---
 
-## `src/config/socket.ts`
+## src/routes/index.ts
 
-Inicializa Socket.IO, configura autenticación JWT para sockets y registra los eventos del sistema.
+Une las rutas de todos los módulos:
+
+| Prefijo | Archivo de rutas |
+|---|---|
+| `/api/health` | Definida directamente en este archivo |
+| `/api/auth` | `auth/auth.routes.ts` |
+| `/api/users` | `users/user.routes.ts` |
+| `/api/profile` | `users/profile.routes.ts` |
+| `/api/notifications` | `notifications/notification.routes.ts` |
+| `/api/common/identification-types` | `common/identificationType.routes.ts` |
+
+---
+
+## src/config/client.ts
+
+Crea y exporta **una única instancia** de Prisma Client. Todos los servicios la importan desde aquí para no abrir conexiones nuevas en cada consulta.
+
+---
+
+## src/config/socket.ts
+
+Inicializa Socket.IO dentro del servidor HTTP:
+
+* Crea la instancia de Socket.IO.
+* Configura CORS con `FRONTEND_URL` para permitir la conexión desde el frontend.
+* Aplica `socketAuthMiddleware` para exigir un token válido al conectarse.
+* Registra los eventos definidos en `sockets/index.socket.ts`.
+* Expone `getIo()` para que los servicios puedan emitir eventos.
+
+---
+
+## src/middlewares/index.ts
+
+Exporta todos los middlewares desde un solo lugar. Las rutas los importan así:
+
+```ts
+import { authMiddleware, roleMiddleware, uploadExcel } from "../../middlewares/index.js";
+```
+
+---
+
+# Autenticación y roles
+
+## Token JWT
+
+* Se genera en el login (`auth.service.ts`) y dura **1 día**.
+* Contiene: `id`, `email` y `role` del usuario.
+* Se firma con la variable `JWT_SECRET`.
+* El frontend lo envía en cada petición: `Authorization: Bearer TOKEN`.
+
+## Middlewares de autenticación
+
+| Middleware | Archivo | Qué hace |
+|---|---|---|
+| `authMiddleware` | `auth/auth.middleware.ts` | Valida el token y guarda el usuario en `req.user`. Si falla, responde `401` |
+| `roleMiddleware(roles)` | `auth/role.middleware.ts` | Permite continuar solo si el rol del usuario está en la lista. Si no, responde `403` |
+| `socketAuthMiddleware` | `auth/socketAuth.middleware.ts` | Valida el token al conectarse por Socket.IO y guarda el usuario en `socket.user` |
+
+`req.user` está tipado con la interfaz `AuthRequest` (`interfaces/auth/auth.interface.ts`) y `socket.user` con `AuthSocket` (`interfaces/sockets/socket.interface.ts`).
+
+## Roles disponibles
+
+| Rol | Descripción |
+|---|---|
+| `ADMIN` | Administra la plataforma y los usuarios (más adelante, las membresías) |
+| `USER` | Persona que presta dinero y administra sus propios registros |
+
+## Uso en las rutas
+
+Ruta solo para ADMIN:
+
+```ts
+router.get(
+  "/",
+  authMiddleware,
+  roleMiddleware(["ADMIN"]),
+  getUsers
+);
+```
+
+Ruta para cualquier usuario con sesión:
+
+```ts
+router.get("/", authMiddleware, getProfile);
+```
+
+---
+
+# Notificaciones en tiempo real
+
+## Funcionamiento
+
+1. El frontend se conecta enviando el token: `io(URL, { auth: { token } })`.
+2. `socketAuthMiddleware` valida el token; si no es válido, rechaza la conexión.
+3. Al conectarse, cada usuario entra a su **sala personal** `user_<id>`.
+4. Cuando un servicio llama a `createNotificationService`, la notificación se guarda en la base de datos y se emite el evento `new_notification` **solo** a la sala de ese usuario.
+
+## Eventos
+
+| Evento | Dirección | Contenido |
+|---|---|---|
+| `connection` | Cliente → servidor | Conexión autenticada |
+| `new_notification` | Servidor → cliente | La notificación creada |
+| `disconnect` | Cliente → servidor | Fin de la conexión |
+
+## Archivos
+
+| Archivo | Responsabilidad |
+|---|---|
+| `config/socket.ts` | Crea Socket.IO y expone `getIo()` |
+| `sockets/index.socket.ts` | Maneja la conexión y une al usuario a su sala |
+| `sockets/notifications/notification.socket.ts` | `emitNotificationToUser`: emite a la sala del usuario |
+| `services/notifications/notification.service.ts` | Crea notificaciones y las emite |
+
+> Actualmente ningún módulo crea notificaciones. La infraestructura queda lista para avisos futuros como "cuota que vence hoy" o "membresía por vencer".
+
+---
+
+# Carga de archivos
+
+## src/middlewares/uploads/excelUpload.middleware.ts
+
+Exporta `uploadExcel`, usado por la carga masiva de usuarios (`POST /api/users/bulk`):
+
+* Guarda el archivo **en memoria** (no en disco); el servicio lo lee desde `req.file.buffer`.
+* Solo acepta archivos Excel (`.xlsx` y `.xls`).
+* Tamaño máximo: 2 MB.
+
+## Carpeta uploads
+
+`app.ts` publica la carpeta `uploads/` en la URL `/uploads`. Hoy no se guardan archivos ahí; queda disponible para futuros comprobantes o documentos.
+
+---
+
+# Validadores reutilizables
+
+## src/utils/validators.ts
+
+Centraliza validaciones genéricas para no repetir expresiones regulares en controladores o servicios.
+
+| Función | Valida | Se usa en |
+|---|---|---|
+| `containsOnlyLetters` | Solo letras, espacios, tildes y ñ | Nombre en registro y carga masiva |
+| `containsOnlyNumbers` | Solo números | Disponible para documentos y teléfonos |
+| `isValidEmail` | Formato básico de correo | Registro y carga masiva |
 
 ---
 
 # Variables de entorno
 
-```env
-PORT=4000
-DATABASE_URL=
-JWT_SECRET=
+## Archivo
+
+```txt
+.env
 ```
 
+## Variables
+
+```env
+DATABASE_URL="mysql://usuario:password@localhost:3306/prestaapp"
+JWT_SECRET="una_clave_larga_y_secreta"
+PORT=4000
+FRONTEND_URL="http://localhost:5173"
+```
+
+## Descripción
+
 | Variable | Descripción |
-| --- | --- |
-| `PORT` | Puerto del backend |
-| `DATABASE_URL` | URL de conexión MySQL usada por Prisma |
-| `JWT_SECRET` | Clave para firmar y validar JWT |
+|---|---|
+| `DATABASE_URL` | URL de conexión a MySQL utilizada por Prisma |
+| `JWT_SECRET` | Clave secreta para generar y validar los tokens JWT |
+| `PORT` | Puerto donde se ejecuta el backend (por defecto `4000`) |
+| `FRONTEND_URL` | URL del frontend, usada en el CORS de Socket.IO |
+
+La guía completa de instalación está en `Instalacion.md`.
 
 ---
 
-# Base de datos
+# Configuración de Prisma
 
-El backend utiliza **MySQL** mediante Prisma.
+## Archivo schema.prisma
 
-El esquema actual contiene los modelos:
+El archivo `prisma/schema.prisma` define:
 
-```txt
-IdentificationType
-User
-PQR
-PqrMessage
-PqrChatRead
-PqrMessageAttachment
-Notification
-```
+* El proveedor de base de datos (MySQL) y la conexión mediante `DATABASE_URL`.
+* La generación del cliente de Prisma.
+* Los modelos: `User`, `IdentificationType` y `Notification`.
+* Los enums: `Role` y `NotificationType`.
+* Las relaciones entre tablas.
+
+El detalle de cada modelo y cómo hacer migraciones está en `Base-de-datos.md`.
+
+---
+
+# Cómo agregar un módulo nuevo
+
+Ejemplo con el próximo módulo, `clients`:
+
+1. Agregar el modelo en `prisma/schema.prisma` y ejecutar `npx prisma migrate dev --name add_clients`.
+2. Crear `src/interfaces/clients/client.interface.ts` con los tipos de datos.
+3. Crear `src/services/clients/client.service.ts` con las consultas y reglas de negocio.
+4. Crear `src/controllers/clients/client.controller.ts` con validaciones y respuestas.
+5. Crear `src/routes/clients/client.routes.ts` con las rutas y sus middlewares.
+6. Registrar las rutas en `src/routes/index.ts`: `router.use("/clients", clientRoutes);`
+7. Verificar con `npx tsc --noEmit` y probar en Postman.
+8. Documentar las rutas en `Endpoints.md` y actualizar este documento (estructura y módulos actuales).

@@ -1,6 +1,5 @@
 import { getIo } from "../../config/socket.js";
 import { emitNotificationToUser } from "../../sockets/notifications/notification.socket.js";
-import { NotificationType, Role } from "@prisma/client";
 import prisma from "../../config/client.js";
 import type { CreateNotificationData } from "../../interfaces/notifications/notification.interface.js";
 
@@ -14,7 +13,6 @@ export const createNotificationService = async (
             message: data.message,
             type: data.type,
             userId: data.userId,
-            pqrId: data.pqrId ?? null,
         },
     });
 
@@ -45,7 +43,6 @@ export const createNotificationsForUsersService = async (
                     message: data.message,
                     type: data.type,
                     userId,
-                    pqrId: data.pqrId ?? null,
                 },
             })
         )

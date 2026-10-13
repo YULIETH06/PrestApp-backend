@@ -5,5 +5,4 @@ export interface CreateNotificationData {
   message: string;
   type: NotificationType;
   userId: number;
-  pqrId?: number;
 }
