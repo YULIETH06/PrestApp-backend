@@ -15,13 +15,11 @@ También incluye los **problemas conocidos pendientes**: fallas detectadas que t
 | 001 | [Error al ejecutar TSX](#incidente-001--error-al-ejecutar-tsx) | 2026-05-08 | ✅ Resuelto |
 | 002 | [Error Prisma Client Runtime](#incidente-002--error-prisma-client-runtime) | 2026-05-08 | ✅ Resuelto |
 | 003 | [Migración bloqueada al quitar un valor de un enum](#incidente-003--migración-bloqueada-al-quitar-un-valor-de-un-enum) | 2026-10-08 | ✅ Resuelto |
-| 004 | [Errores de TypeScript después de eliminar el módulo PQR](#incidente-004--errores-de-typescript-después-de-eliminar-el-módulo-pqr) | 2026-10-08 | ✅ Resuelto |
 
 | Problemas conocidos pendientes |
 |---|
 | [P-01 El login distingue mayúsculas en el correo](#p-01--el-login-distingue-mayúsculas-en-el-correo) |
 | [P-02 Carga masiva responde HTML si el archivo no es Excel](#p-02--carga-masiva-responde-html-si-el-archivo-no-es-excel) |
-| [P-03 El servicio de notificaciones todavía usa pqrId](#p-03--el-servicio-de-notificaciones-todavía-usa-pqrid) |
 
 ---
 
@@ -230,100 +228,6 @@ Antes de quitar un valor de un enum o borrar una columna, revisar qué filas lo 
 
 ---
 
-# Incidente #004 — Errores de TypeScript después de eliminar el módulo PQR
-
-## Fecha
-
-2026-10-08
-
-## Descripción del incidente
-
-Después de borrar las carpetas del módulo PQR, `npx tsc --noEmit` mostró 4 errores en archivos de usuarios que no tenían relación aparente con PQR.
-
-## Error presentado
-
-```txt
-src/controllers/users/userBulk.controller.ts:16:18 - error TS2339:
-Property 'file' does not exist on type 'Request<...>'.
-
-src/routes/users/user.routes.ts:19:3 - error TS2305:
-Module '"../../middlewares/index.js"' has no exported member 'uploadExcel'.
-
-src/services/users/user.service.ts:66:24 - error TS2339:
-Property 'AGENT' does not exist on type '{ USER: "USER"; ADMIN: "ADMIN"; }'.
-```
-
-## Causa identificada
-
-- El middleware `uploadExcel`, usado por la carga masiva de usuarios, estaba definido **dentro** del archivo de adjuntos de PQR (`pqrAttachmentUpload.middleware.ts`) y se borró con él.
-- TypeScript solo reconoce `req.file` cuando algún archivo del proyecto importa `multer`. Ese archivo era el único que lo hacía.
-- La función `getAgentsService` (lista de agentes para asignar PQR) seguía usando `Role.AGENT`.
-
-## Solución aplicada
-
-### 1. Crear el middleware de Excel en su propio archivo
-
-```txt
-src/middlewares/uploads/excelUpload.middleware.ts
-```
-
-Y exportarlo en `src/middlewares/index.ts`:
-
-```ts
-export * from "./uploads/excelUpload.middleware.js";
-```
-
-### 2. Eliminar la lista de agentes
-
-Se borraron `getAgentsService`, el controlador `getAgents` y la ruta `GET /api/users/agents`.
-
-### 3. Quitar AGENT de las validaciones de texto
-
-- `allowedRoles` en `user.controller.ts` quedó con `USER` y `ADMIN`.
-- El mensaje de rol inválido en `userBulk.service.ts` quedó: "Los roles permitidos son USER y ADMIN".
-
-## Validación realizada
-
-```bash
-npx tsc --noEmit
-npm run dev
-```
-
-Sin errores y con el servidor funcionando.
-
-## Resultado final
-
-- Carga masiva de usuarios funcionando con su propio middleware.
-- Ninguna referencia al rol `AGENT` en el código.
-
-## Observaciones
-
-Antes de borrar un archivo, revisar **qué exporta y quién lo usa**. Un archivo puede tener código de otros módulos aunque su nombre no lo indique.
-
----
-
-# Problemas conocidos pendientes
-
-Fallas detectadas al documentar el backend que todavía no se han corregido. Al resolver una, se pasa a la lista de incidentes con su número.
-
-## P-01 — El login distingue mayúsculas en el correo
-
-### Descripción
-
-El registro guarda el correo en minúsculas, pero el login lo busca tal como se escribe.
-
-### Cómo reproducirlo
-
-1. Registrar un usuario con `juan@gmail.com`.
-2. Iniciar sesión con `Juan@Gmail.com`.
-3. Responde `400 — Credenciales inválidas`.
-
-### Solución propuesta
-
-En `loginUserService` (`auth.service.ts`), convertir el correo a minúsculas y quitar espacios antes de buscarlo, igual que en el registro.
-
----
-
 ## P-02 — Carga masiva responde HTML si el archivo no es Excel
 
 ### Descripción
@@ -333,20 +237,6 @@ Si en `POST /api/users/bulk` se envía un archivo que no es Excel o que pesa má
 ### Solución propuesta
 
 Crear un middleware de errores en `src/middlewares/errors/` que convierta los errores de multer en una respuesta `400` con `message`, y registrarlo al final de `app.ts`.
-
----
-
-## P-03 — El servicio de notificaciones todavía usa pqrId
-
-### Descripción
-
-`notification.service.ts` envía `pqrId: data.pqrId ?? null` al crear notificaciones, y `notification.interface.ts` todavía declara `pqrId?: number`. La columna `pqrId` ya no existe en la base de datos.
-
-TypeScript no lo detecta, pero **Prisma fallará** con `Unknown argument pqrId` la primera vez que se intente crear una notificación. Hoy no se nota porque ningún módulo crea notificaciones.
-
-### Solución propuesta
-
-Eliminar `pqrId` de las dos funciones de `notification.service.ts` y de la interfaz `CreateNotificationData`.
 
 ---
 
