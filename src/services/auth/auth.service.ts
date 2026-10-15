@@ -10,7 +10,7 @@ import type {
 import {
   containsOnlyLetters,
   isValidEmail,
-} from "../../utils/validators.js";
+} from "../../utils/common/validators.js";
 
 // Registra un usuario individual.
 export const registerUserService = async ({

@@ -26,3 +26,13 @@ export const isValidEmail = (
 
     return emailRegex.test(email);
 };
+// Valida un número de teléfono: solo números, entre 7 y 15 dígitos.
+export const isValidPhone = (
+    phone: string
+): boolean => {
+    return (
+        containsOnlyNumbers(phone) &&
+        phone.length >= 7 &&
+        phone.length <= 15
+    );
+};

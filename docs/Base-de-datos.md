@@ -6,13 +6,14 @@ Este documento describe la base de datos del backend de PrestApp: los modelos de
 
 La base de datos es **MySQL** y se administra con **Prisma 6**. Toda la estructura se define en `schema.prisma`; **las tablas nunca se modifican a mano en MySQL**.
 
-Actualmente el sistema tiene tres modelos:
+Actualmente el sistema tiene cuatro modelos:
 
 | Modelo | Para qué sirve |
 |---|---|
-| `User` | Usuarios que inician sesión en la aplicación |
+| `User` | Usuarios que inician sesión en la aplicación (prestamistas y administrador) |
 | `IdentificationType` | Catálogo de tipos de documento (CC, CE, NIT…) |
 | `Notification` | Notificaciones internas de cada usuario |
+| `Client` | Clientes de cada prestamista: las personas a quienes les presta dinero |
 
 ---
 
@@ -55,7 +56,10 @@ Un `?` después del tipo (`String?`) indica que el campo es opcional.
 | `@updatedAt` | Actualiza la fecha automáticamente cada vez que el registro cambia |
 | `@unique` | No permite valores repetidos |
 | `@db.VarChar(n)` | Texto con un máximo de `n` caracteres en MySQL |
+| `@db.Text` | Texto largo en MySQL (para observaciones) |
 | `@relation` | Define la relación con otra tabla |
+| `@@unique([campo1, campo2])` | No permite repetir la **combinación** de esos campos |
+| `@@index([campo])` | Crea un índice para que las búsquedas por ese campo sean más rápidas |
 
 ---
 
@@ -115,6 +119,7 @@ Cada usuario tiene un rol (`USER` o `ADMIN`). La contraseña se guarda encriptad
 | `createdAt` | DateTime | Fecha de creación |
 | `updatedAt` | DateTime | Fecha de última actualización |
 | `notifications` | Notification[] | Notificaciones recibidas por el usuario |
+| `clients` | Client[] | Clientes registrados por el usuario |
 
 ## Restricciones principales
 
@@ -134,7 +139,7 @@ El modelo `IdentificationType` representa el catálogo de tipos de documento de 
 
 Permite reutilizar los tipos de documento sin escribir su nombre en cada tabla: las demás tablas guardan solo el `id` del tipo. Cada tipo puede activarse o desactivarse con `isActive`; el API solo devuelve los activos.
 
-Se usará en el módulo de clientes para el documento de cada persona a la que se le presta.
+Se usa en el módulo de clientes para el documento de cada persona a la que se le presta. Al crear o editar un cliente, el tipo de identificación debe estar activo.
 
 Los registros se cargan con SQL (ver `Instalacion.md`).
 
@@ -148,6 +153,7 @@ Los registros se cargan con SQL (ver `Instalacion.md`).
 | `isActive` | Boolean | Indica si el tipo está disponible en los formularios. Por defecto `true` |
 | `createdAt` | DateTime | Fecha de creación |
 | `updatedAt` | DateTime | Fecha de última actualización |
+| `clients` | Client[] | Clientes que tienen este tipo de documento |
 
 ## Restricciones principales
 
@@ -183,15 +189,67 @@ Cuando se crea una notificación, además de guardarse en la base de datos, se e
 
 ---
 
+# Modelo Client
+
+## Descripción
+
+El modelo `Client` representa a las personas a quienes un prestamista (`User`) les presta dinero. Cada cliente pertenece a **un solo** prestamista, y cada prestamista solo ve y administra sus propios clientes.
+
+Los clientes **no se eliminan**: se desactivan con `isActive = false`. Así se conserva su historial cuando tengan préstamos.
+
+## Campos principales
+
+| Campo | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `id` | Int | Auto | Identificador único del cliente |
+| `userId` | Int | Sí | Id del prestamista dueño del cliente. Se toma del token, nunca del formulario |
+| `identificationTypeId` | Int | Sí | Id del tipo de documento |
+| `identificationNumber` | String | Sí | Número de documento, máximo 30 caracteres. Es texto y no número porque puede tener ceros a la izquierda o letras (pasaporte). Se guarda sin espacios y en mayúsculas |
+| `fullName` | String | Sí | Nombre completo, máximo 150 caracteres |
+| `phone` | String | Sí | Teléfono principal, máximo 20 caracteres |
+| `secondaryPhone` | String? | No | Teléfono de referencia |
+| `address` | String | Sí | Dirección, máximo 200 caracteres |
+| `neighborhood` | String | Sí | Barrio, máximo 100 caracteres |
+| `notes` | String? | No | Observaciones (texto largo) |
+| `isActive` | Boolean | Auto | Indica si el cliente está activo. Por defecto `true` |
+| `createdAt` | DateTime | Auto | Fecha de creación |
+| `updatedAt` | DateTime | Auto | Fecha de última actualización |
+| `user` | User | — | Relación con el prestamista |
+| `identificationType` | IdentificationType | — | Relación con el tipo de documento |
+
+> Los límites de la base de datos son el máximo absoluto. La validación del backend es más estricta (por ejemplo, el documento debe tener entre 5 y 20 caracteres). Ver `Endpoints.md`.
+
+## Restricciones principales
+
+```prisma
+@@unique([userId, identificationNumber])
+```
+
+Un mismo prestamista no puede registrar dos clientes con el mismo número de documento. Dos prestamistas **distintos** sí pueden tener a la misma persona como cliente.
+
+El backend revisa esta regla antes de guardar y responde *"Ya tienes un cliente registrado con ese número de identificación"*. La restricción en la base de datos queda como protección adicional.
+
+```prisma
+@@index([identificationTypeId])
+```
+
+Índice para las consultas por tipo de documento.
+
+---
+
 # Relaciones
 
 ```txt
 User 1 ─────── * Notification
+
+User 1 ─────── * Client * ─────── 1 IdentificationType
 ```
 
 | Relación | Tipo | Descripción |
 |---|---|---|
 | `User` → `Notification` | Uno a muchos | Un usuario puede tener muchas notificaciones; cada notificación pertenece a un solo usuario |
+| `User` → `Client` | Uno a muchos | Un prestamista puede tener muchos clientes; cada cliente pertenece a un solo prestamista |
+| `IdentificationType` → `Client` | Uno a muchos | Un tipo de documento puede usarse en muchos clientes; cada cliente tiene un solo tipo de documento |
 
 ---
 
@@ -203,14 +261,7 @@ Una migración es el proceso mediante el cual Prisma convierte los cambios hecho
 
 Cada migración queda guardada en una carpeta dentro de `prisma/migrations`, con un archivo `migration.sql` que contiene las instrucciones SQL que se ejecutaron. Así queda un historial de todos los cambios de la base de datos.
 
-```txt
-prisma/migrations/
-├── 20260507150954_init/
-│   └── migration.sql
-├── ...
-└── 20261008211926_remove_pqr/
-    └── migration.sql
-```
+El nombre de cada carpeta empieza con la fecha y hora en que se creó, seguido del nombre de la migración. Para ver el historial completo basta con abrir `prisma/migrations`.
 
 ## Cómo hacer un cambio en la base de datos
 
@@ -277,12 +328,5 @@ const user = await prisma.user.findUnique({
 Métodos más usados: `findMany`, `findUnique`, `findFirst`, `create`, `createMany`, `update`, `updateMany`, `count`.
 
 ## Historial de migraciones
-
-| Migración | Qué hizo |
-|---|---|
-| `20260507150954_init` | Crea la tabla `User` |
-| `20260512143946_add_role_to_user` | Agrega el campo `role` a los usuarios |
-| `20260512153537_create_pqr_model` a `20260903162019_actualizar_estructura_pqr` | Migraciones del proyecto anterior: módulo PQR, chat, adjuntos, rol `AGENT`, notificaciones y la tabla `IdentificationType` |
-| `20261008211926_remove_pqr` | Elimina el módulo PQR y el rol `AGENT`. Deja solo `User`, `IdentificationType` y `Notification` |
 
 Las migraciones del proyecto anterior se conservan porque forman parte del historial: Prisma las necesita para saber en qué estado está la base de datos. Al clonar el proyecto y ejecutar `npx prisma migrate dev`, se aplican todas en orden y el resultado final es el esquema actual.

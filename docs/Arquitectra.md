@@ -66,7 +66,7 @@ PrestApp-backend/
 
 # Estructura interna de src
 
-El código se organiza **por capa** (routes, controllers, services…) y dentro de cada capa **por módulo** (auth, users, notifications, common). Así, todo lo de un módulo tiene el mismo nombre de carpeta en cada capa.
+El código se organiza **por capa** (routes, controllers, services…) y dentro de cada capa **por módulo** (auth, users, notifications, clients, common). Así, todo lo de un módulo tiene el mismo nombre de carpeta en cada capa.
 
 ```txt
 src/
@@ -81,6 +81,8 @@ src/
 ├── controllers/
 │   ├── auth/
 │   │   └── auth.controller.ts
+│   ├── clients/
+│   │   └── client.controller.ts
 │   ├── common/
 │   │   └── identificationType.controller.ts
 │   ├── notifications/
@@ -93,6 +95,8 @@ src/
 ├── interfaces/
 │   ├── auth/
 │   │   └── auth.interface.ts
+│   ├── clients/
+│   │   └── client.interface.ts
 │   ├── notifications/
 │   │   └── notification.interface.ts
 │   ├── sockets/
@@ -114,6 +118,8 @@ src/
 ├── routes/
 │   ├── auth/
 │   │   └── auth.routes.ts
+│   ├── clients/
+│   │   └── client.routes.ts
 │   ├── common/
 │   │   └── identificationType.routes.ts
 │   ├── notifications/
@@ -126,6 +132,8 @@ src/
 ├── services/
 │   ├── auth/
 │   │   └── auth.service.ts
+│   ├── clients/
+│   │   └── client.service.ts
 │   ├── common/
 │   │   └── identificationType.service.ts
 │   ├── notifications/
@@ -142,7 +150,11 @@ src/
 ├── helpers/             (vacía)
 │
 └── utils/
-    └── validators.ts
+    ├── clients/
+    │   └── client.validation.ts
+    └── common/
+        ├── textUtils.ts
+        └── validators.ts
 ```
 
 > Las carpetas `helpers`, `middlewares/errors` y `middlewares/validation` están vacías. Quedan reservadas para el manejador de errores y validaciones que se agreguen más adelante. Git no guarda carpetas vacías, así que pueden no aparecer al clonar el proyecto.
@@ -161,7 +173,8 @@ src/
 | `interfaces` | Tipos de TypeScript compartidos por módulo |
 | `sockets` | Eventos de Socket.IO organizados por funcionalidad |
 | `helpers` | Funciones de apoyo específicas de un proceso de negocio (vacía por ahora) |
-| `utils` | Funciones genéricas reutilizables en cualquier módulo |
+| `utils/common` | Funciones genéricas reutilizables en cualquier módulo (validar y limpiar textos) |
+| `utils/<módulo>` | Validación de los datos de entrada de un módulo |
 
 ---
 
@@ -172,6 +185,7 @@ src/
 | `auth` | Registro, login y cambio de contraseña propia | route, controller, service, interface |
 | `users` | Perfil, administración de usuarios y carga masiva desde Excel | 2 routes, 3 controllers, 2 services, 1 interface |
 | `notifications` | Notificaciones por usuario (HTTP y tiempo real) | route, controller, service, interface, socket |
+| `clients` | Clientes de cada prestamista: listar, ver, crear, editar, activar y desactivar | route, controller, service, interface, validation |
 | `common` | Catálogos compartidos: tipos de identificación | route, controller, service |
 
 Las rutas de cada módulo están documentadas en `Endpoints.md`.
@@ -190,8 +204,9 @@ Route → Middlewares → Controller → Service → Prisma → MySQL
 |---|---|---|
 | Route | Define método, URL, middlewares y controlador | `router.patch("/:id/role", authMiddleware, roleMiddleware(["ADMIN"]), updateUserRole)` |
 | Middleware | Verifica token, rol o archivo antes de continuar | `authMiddleware` |
-| Controller | Lee `req`, valida datos de entrada y responde con el código adecuado | `updateUserRole` valida el `id` y el `role` |
-| Service | Aplica reglas de negocio y consulta la base de datos | `updateUserRoleService` actualiza el usuario |
+| Controller | Lee `req`, valida los datos de entrada y responde con el código adecuado | `updateUserRole` valida el `id` y el `role` |
+| Validación | Revisa el **formato** de los datos y los limpia. No consulta la base de datos | `validateClientData` en `utils/clients/client.validation.ts` |
+| Service | Aplica las **reglas del negocio** y consulta la base de datos | `createClientService` revisa el documento repetido y guarda el cliente |
 
 Reglas que se siguen:
 
@@ -243,6 +258,7 @@ Une las rutas de todos los módulos:
 | `/api/users` | `users/user.routes.ts` |
 | `/api/profile` | `users/profile.routes.ts` |
 | `/api/notifications` | `notifications/notification.routes.ts` |
+| `/api/clients` | `clients/client.routes.ts` |
 | `/api/common/identification-types` | `common/identificationType.routes.ts` |
 
 ---
@@ -368,17 +384,44 @@ Exporta `uploadExcel`, usado por la carga masiva de usuarios (`POST /api/users/b
 
 ---
 
-# Validadores reutilizables
+# Utilidades
 
-## src/utils/validators.ts
+## Regla de organización
 
-Centraliza validaciones genéricas para no repetir expresiones regulares en controladores o servicios.
+```txt
+Si una función sirve para cualquier módulo, va en utils/common.
+Si valida los datos de un solo módulo, va en utils/nombreModulo.
+Las funciones de utils no consultan la base de datos.
+```
+
+## src/utils/common/validators.ts
+
+Funciones que **validan**: responden `true` o `false`.
 
 | Función | Valida | Se usa en |
 |---|---|---|
-| `containsOnlyLetters` | Solo letras, espacios, tildes y ñ | Nombre en registro y carga masiva |
-| `containsOnlyNumbers` | Solo números | Disponible para documentos y teléfonos |
+| `containsOnlyLetters` | Solo letras, espacios, tildes y ñ | Nombre en registro, carga masiva y clientes |
+| `containsOnlyNumbers` | Solo números | `isValidPhone` |
 | `isValidEmail` | Formato básico de correo | Registro y carga masiva |
+| `isValidPhone` | Solo números, entre 7 y 15 dígitos | Teléfonos de clientes |
+
+## src/utils/common/textUtils.ts
+
+Funciones que **limpian** un texto: devuelven el texto arreglado.
+
+| Función | Qué hace | Ejemplo |
+|---|---|---|
+| `cleanText` | Quita espacios al inicio y al final, y deja un solo espacio entre palabras | `"  María   López "` → `"María López"` |
+| `removeSpaces` | Quita todos los espacios | `"300 123 4567"` → `"3001234567"` |
+
+Si el valor no es texto, ambas devuelven `""`.
+
+## src/utils/clients/client.validation.ts
+
+| Función | Qué hace | Se usa en |
+|---|---|---|
+| `validateClientData(body)` | Revisa el formato de los datos de un cliente y los limpia. Devuelve `{ isValid: false, message }` o `{ isValid: true, data }` | Crear y editar cliente |
+| `parseClientStatus(value)` | Convierte `?status=` en `active`, `inactive` o `all`. Devuelve `null` si no es válido | Listar clientes |
 
 ---
 
@@ -420,7 +463,7 @@ El archivo `prisma/schema.prisma` define:
 
 * El proveedor de base de datos (MySQL) y la conexión mediante `DATABASE_URL`.
 * La generación del cliente de Prisma.
-* Los modelos: `User`, `IdentificationType` y `Notification`.
+* Los modelos: `User`, `IdentificationType`, `Notification` y `Client`.
 * Los enums: `Role` y `NotificationType`.
 * Las relaciones entre tablas.
 
@@ -430,13 +473,14 @@ El detalle de cada modelo y cómo hacer migraciones está en `Base-de-datos.md`.
 
 # Cómo agregar un módulo nuevo
 
-Ejemplo con el próximo módulo, `clients`:
+Se sigue el mismo orden con el que se construyó `clients`. Ejemplo con el próximo módulo, `loans`:
 
-1. Agregar el modelo en `prisma/schema.prisma` y ejecutar `npx prisma migrate dev --name add_clients`.
-2. Crear `src/interfaces/clients/client.interface.ts` con los tipos de datos.
-3. Crear `src/services/clients/client.service.ts` con las consultas y reglas de negocio.
-4. Crear `src/controllers/clients/client.controller.ts` con validaciones y respuestas.
-5. Crear `src/routes/clients/client.routes.ts` con las rutas y sus middlewares.
-6. Registrar las rutas en `src/routes/index.ts`: `router.use("/clients", clientRoutes);`
-7. Verificar con `npx tsc --noEmit` y probar en Postman.
-8. Documentar las rutas en `Endpoints.md` y actualizar este documento (estructura y módulos actuales).
+1. Agregar el modelo en `prisma/schema.prisma` y ejecutar `npx prisma migrate dev --name add_loans`.
+2. Crear `src/interfaces/loans/loan.interface.ts` con los tipos de datos.
+3. Crear `src/utils/loans/loan.validation.ts` con la validación y limpieza de los datos. Usar las funciones de `utils/common` antes de crear funciones nuevas.
+4. Crear `src/services/loans/loan.service.ts` con las consultas y las reglas del negocio (`throw new Error("mensaje")`).
+5. Crear `src/controllers/loans/loan.controller.ts`: revisa el usuario, el id y la validación, llama al servicio y responde.
+6. Crear `src/routes/loans/loan.routes.ts` con las rutas y sus middlewares.
+7. Registrar las rutas en `src/routes/index.ts`: `router.use("/loans", loanRoutes);`
+8. Verificar con `npx tsc --noEmit` y probar en Postman.
+9. Documentar las rutas en `Endpoints.md`, el modelo en `Base-de-datos.md` y actualizar este documento (estructura y módulos actuales).

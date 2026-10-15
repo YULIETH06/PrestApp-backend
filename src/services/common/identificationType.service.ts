@@ -19,3 +19,23 @@ export const getActiveIdentificationTypesService =
 
         return identificationTypes;
     };
+
+// Busca un tipo de identificación activo por su id.
+// Devuelve null si no existe o está inactivo.
+export const getActiveIdentificationTypeByIdService =
+    async (id: number) => {
+        const identificationType =
+            await prisma.identificationType.findFirst({
+                where: {
+                    id,
+                    isActive: true,
+                },
+                select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                },
+            });
+
+        return identificationType;
+    };

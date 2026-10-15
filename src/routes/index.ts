@@ -7,6 +7,8 @@ import notificationRoutes from "./notifications/notification.routes.js";
 
 import identificationTypeRoutes from "./common/identificationType.routes.js";
 
+import clientRoutes from "./clients/client.routes.js";
+
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -28,5 +30,8 @@ router.use(
   "/common/identification-types",
   identificationTypeRoutes
 );
+
+// Clientes.
+router.use("/clients", clientRoutes);
 
 export default router;

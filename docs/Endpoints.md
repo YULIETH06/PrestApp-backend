@@ -32,7 +32,7 @@ Todas las respuestas son JSON e incluyen un campo `message`.
 |---|---|
 | `200` | Operación exitosa |
 | `201` | Registro creado |
-| `400` | Datos inválidos o incompletos |
+| `400` | Datos inválidos o incompletos, o una regla del negocio no se cumple |
 | `401` | No hay sesión o el token no es válido |
 | `403` | El usuario no tiene el rol necesario |
 | `404` | El registro no existe |
@@ -101,6 +101,11 @@ Por ejemplo, un `USER` intentando usar una ruta de `ADMIN`.
 | | GET | `/api/notifications/unread-count` | 🔒 USER, ADMIN |
 | | PATCH | `/api/notifications/read-all` | 🔒 USER, ADMIN |
 | | PATCH | `/api/notifications/:id/read` | 🔒 USER, ADMIN |
+| [Clientes](#clientes) | GET | `/api/clients` | 🔒 USER, ADMIN |
+| | GET | `/api/clients/:id` | 🔒 USER, ADMIN |
+| | POST | `/api/clients` | 🔒 USER, ADMIN |
+| | PUT | `/api/clients/:id` | 🔒 USER, ADMIN |
+| | PATCH | `/api/clients/:id/status` | 🔒 USER, ADMIN |
 | [Catálogos](#catálogos) | GET | `/api/common/identification-types` | 🔒 USER, ADMIN |
 
 ---
@@ -1328,6 +1333,632 @@ Marca una notificación como leída. Solo funciona con notificaciones del usuari
 ```json
 {
   "message": "Error al marcar la notificación como leída."
+}
+```
+
+---
+
+# Clientes
+
+Cada usuario (USER o ADMIN) administra **solo sus propios** clientes: las personas a quienes les presta dinero. El usuario se identifica por el token; el `userId` nunca se envía en el body.
+
+Los clientes **no se eliminan**: se desactivan, para conservar su historial cuando tengan préstamos.
+
+| Método | Ruta | Descripción | Acceso |
+|---|---|---|---|
+| GET | `/api/clients` | Lista mis clientes, con búsqueda y filtro por estado | 🔒 USER, ADMIN |
+| GET | `/api/clients/:id` | Obtiene un cliente | 🔒 USER, ADMIN |
+| POST | `/api/clients` | Registra un cliente | 🔒 USER, ADMIN |
+| PUT | `/api/clients/:id` | Actualiza los datos de un cliente | 🔒 USER, ADMIN |
+| PATCH | `/api/clients/:id/status` | Activa o desactiva un cliente | 🔒 USER, ADMIN |
+
+---
+
+## Obtener clientes
+
+### Endpoint
+
+```http
+GET /api/clients
+```
+
+### Ejemplos
+
+```http
+GET /api/clients
+GET /api/clients?search=juan
+GET /api/clients?status=active
+GET /api/clients?search=300&status=inactive
+```
+
+### Header requerido
+
+```http
+Authorization: Bearer TOKEN
+```
+
+### Acceso permitido
+
+* USER
+* ADMIN
+
+### Descripción
+
+Devuelve los clientes del usuario dueño del token, ordenados por nombre de la A a la Z.
+
+### Parámetros de consulta (opcionales)
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `search` | string | Busca en el nombre, el número de identificación, el teléfono y el teléfono secundario. No distingue mayúsculas. |
+| `status` | string | `active`, `inactive` o `all`. Si no se envía, se usa `all`. |
+
+### Respuesta exitosa — `200`
+
+```json
+{
+  "message": "Clientes obtenidos correctamente",
+  "clients": [
+    {
+      "id": 1,
+      "identificationNumber": "1023456",
+      "fullName": "Juan Pérez",
+      "phone": "3001234567",
+      "secondaryPhone": null,
+      "address": "Cra 10 # 20-30",
+      "neighborhood": "Centro",
+      "notes": null,
+      "isActive": true,
+      "createdAt": "2026-10-15T14:00:00.000Z",
+      "updatedAt": "2026-10-15T14:00:00.000Z",
+      "identificationType": {
+        "id": 1,
+        "code": "CC",
+        "name": "Cédula de ciudadanía"
+      }
+    }
+  ]
+}
+```
+
+Si el usuario no tiene clientes, o ninguno coincide con la búsqueda, `clients` es una lista vacía `[]`.
+
+### Respuesta si el estado no es válido — `400`
+
+```json
+{
+  "message": "El estado no es válido. Use active, inactive o all"
+}
+```
+
+### Respuesta en caso de error — `400`
+
+```json
+{
+  "message": "Error al obtener los clientes"
+}
+```
+
+---
+
+## Obtener un cliente
+
+### Endpoint
+
+```http
+GET /api/clients/:id
+```
+
+### Ejemplo
+
+```http
+GET /api/clients/1
+```
+
+### Header requerido
+
+```http
+Authorization: Bearer TOKEN
+```
+
+### Acceso permitido
+
+* USER
+* ADMIN
+
+### Descripción
+
+Devuelve un cliente del usuario dueño del token, con su tipo de identificación.
+
+### Parámetros
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `id` | number | Id del cliente |
+
+### Respuesta exitosa — `200`
+
+```json
+{
+  "message": "Cliente obtenido correctamente",
+  "client": {
+    "id": 1,
+    "identificationNumber": "1023456",
+    "fullName": "Juan Pérez",
+    "phone": "3001234567",
+    "secondaryPhone": null,
+    "address": "Cra 10 # 20-30",
+    "neighborhood": "Centro",
+    "notes": null,
+    "isActive": true,
+    "createdAt": "2026-10-15T14:00:00.000Z",
+    "updatedAt": "2026-10-15T14:00:00.000Z",
+    "identificationType": {
+      "id": 1,
+      "code": "CC",
+      "name": "Cédula de ciudadanía"
+    }
+  }
+}
+```
+
+### Respuesta si el id no es válido — `400`
+
+```json
+{
+  "message": "El id del cliente no es válido"
+}
+```
+
+### Respuesta si el cliente no existe o es de otro usuario — `400`
+
+```json
+{
+  "message": "El cliente no existe"
+}
+```
+
+### Respuesta en caso de error — `400`
+
+```json
+{
+  "message": "Error al obtener el cliente"
+}
+```
+
+---
+
+## Registrar cliente
+
+### Endpoint
+
+```http
+POST /api/clients
+```
+
+### Header requerido
+
+```http
+Authorization: Bearer TOKEN
+```
+
+### Acceso permitido
+
+* USER
+* ADMIN
+
+### Descripción
+
+Registra un cliente nuevo para el usuario dueño del token. El cliente queda activo.
+
+Funciones implementadas:
+
+* Limpieza y normalización de datos antes de guardar.
+* Validación de campos obligatorios y de formato.
+* Verificación de que el tipo de identificación exista y esté activo.
+* Verificación de que el usuario no tenga otro cliente con el mismo número de identificación.
+* Dos usuarios distintos **sí** pueden registrar a la misma persona como cliente.
+
+### Campos del body
+
+| Campo | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `identificationTypeId` | number | Sí | Id del tipo de identificación (ver `/api/common/identification-types`) |
+| `identificationNumber` | string | Sí | Número de documento |
+| `fullName` | string | Sí | Nombre completo |
+| `phone` | string | Sí | Teléfono principal |
+| `secondaryPhone` | string | No | Teléfono de referencia |
+| `address` | string | Sí | Dirección |
+| `neighborhood` | string | Sí | Barrio |
+| `notes` | string | No | Observaciones |
+
+### Body
+
+```json
+{
+  "identificationTypeId": 1,
+  "identificationNumber": "1023456",
+  "fullName": "Juan Pérez",
+  "phone": "3001234567",
+  "secondaryPhone": "3209998877",
+  "address": "Cra 10 # 20-30",
+  "neighborhood": "Centro",
+  "notes": "Trabaja en la panadería de la esquina"
+}
+```
+
+### Validaciones implementadas
+
+#### Tipo de identificación
+
+* Es obligatorio y debe ser un número entero mayor a 0.
+* Debe existir y estar activo.
+
+#### Número de identificación
+
+* Es obligatorio.
+* Se eliminan todos los espacios y se convierte a mayúsculas (`" 10 23 45ab "` se guarda como `102345AB`).
+* Debe tener entre 5 y 20 caracteres, solo letras y números.
+* El usuario no puede tener otro cliente con el mismo número.
+
+#### Nombre completo
+
+* Es obligatorio.
+* Se eliminan los espacios al inicio y al final, y los espacios dobles.
+* Debe tener entre 3 y 150 caracteres.
+* Solo permite letras, espacios, tildes y la letra ñ.
+
+#### Teléfono y teléfono secundario
+
+* El teléfono es obligatorio; el secundario es opcional.
+* Se eliminan todos los espacios (`"300 123 4567"` se guarda como `3001234567`).
+* Solo números, entre 7 y 15 dígitos.
+* El teléfono secundario no puede ser igual al principal.
+* Si el secundario se envía vacío, se guarda como `null`.
+
+#### Dirección y barrio
+
+* Ambos son obligatorios.
+* Se eliminan los espacios al inicio y al final, y los espacios dobles.
+* La dirección admite máximo 200 caracteres y el barrio máximo 100.
+
+#### Notas
+
+* Son opcionales; si se envían vacías se guardan como `null`.
+* Máximo 500 caracteres.
+
+### Respuesta exitosa — `201`
+
+```json
+{
+  "message": "Cliente registrado correctamente",
+  "client": {
+    "id": 1,
+    "identificationNumber": "1023456",
+    "fullName": "Juan Pérez",
+    "phone": "3001234567",
+    "secondaryPhone": "3209998877",
+    "address": "Cra 10 # 20-30",
+    "neighborhood": "Centro",
+    "notes": "Trabaja en la panadería de la esquina",
+    "isActive": true,
+    "createdAt": "2026-10-15T14:00:00.000Z",
+    "updatedAt": "2026-10-15T14:00:00.000Z",
+    "identificationType": {
+      "id": 1,
+      "code": "CC",
+      "name": "Cédula de ciudadanía"
+    }
+  }
+}
+```
+
+### Respuestas de validación — `400`
+
+Se revisan en este orden y se responde el **primer** error encontrado:
+
+| Caso | Mensaje |
+|---|---|
+| Falta el tipo de identificación o no es un número válido | El tipo de identificación es obligatorio |
+| Falta el número de identificación | El número de identificación es obligatorio |
+| Número de identificación con formato inválido | El número de identificación debe tener entre 5 y 20 caracteres, solo letras y números |
+| Falta el nombre | El nombre completo es obligatorio |
+| Nombre muy corto o muy largo | El nombre completo debe tener entre 3 y 150 caracteres |
+| Nombre con números o símbolos | El nombre completo solo puede contener letras y espacios |
+| Falta el teléfono | El teléfono es obligatorio |
+| Teléfono con formato inválido | El teléfono debe tener entre 7 y 15 dígitos, solo números |
+| Teléfono secundario con formato inválido | El teléfono secundario debe tener entre 7 y 15 dígitos, solo números |
+| Teléfono secundario igual al principal | El teléfono secundario no puede ser igual al teléfono principal |
+| Falta la dirección | La dirección es obligatoria |
+| Dirección muy larga | La dirección no puede tener más de 200 caracteres |
+| Falta el barrio | El barrio es obligatorio |
+| Barrio muy largo | El barrio no puede tener más de 100 caracteres |
+| Notas muy largas | Las notas no pueden tener más de 500 caracteres |
+
+Ejemplo:
+
+```json
+{
+  "message": "El barrio es obligatorio"
+}
+```
+
+### Respuesta si el tipo de identificación no existe o está inactivo — `400`
+
+```json
+{
+  "message": "El tipo de identificación no existe o está inactivo"
+}
+```
+
+### Respuesta si el documento ya está registrado — `400`
+
+```json
+{
+  "message": "Ya tienes un cliente registrado con ese número de identificación"
+}
+```
+
+### Respuesta en caso de error — `400`
+
+```json
+{
+  "message": "Error al registrar el cliente"
+}
+```
+
+---
+
+## Actualizar cliente
+
+### Endpoint
+
+```http
+PUT /api/clients/:id
+```
+
+### Ejemplo
+
+```http
+PUT /api/clients/1
+```
+
+### Header requerido
+
+```http
+Authorization: Bearer TOKEN
+```
+
+### Acceso permitido
+
+* USER
+* ADMIN
+
+### Descripción
+
+Reemplaza los datos de un cliente del usuario dueño del token. Se deben enviar **todos** los campos, igual que al registrar; los opcionales que no se envíen quedan en `null`.
+
+Funciones implementadas:
+
+* Las mismas validaciones y limpieza de datos que al registrar.
+* Verificación de que el cliente exista y pertenezca al usuario.
+* Al revisar el documento repetido, el cliente que se edita no se compara consigo mismo: se puede guardar sin cambiar su número de identificación.
+
+### Parámetros
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `id` | number | Id del cliente |
+
+### Campos del body
+
+Los mismos de [Registrar cliente](#registrar-cliente).
+
+### Body
+
+```json
+{
+  "identificationTypeId": 1,
+  "identificationNumber": "1023456",
+  "fullName": "Juan Pérez",
+  "phone": "3011112222",
+  "secondaryPhone": "",
+  "address": "Cra 10 # 20-30",
+  "neighborhood": "Centro",
+  "notes": ""
+}
+```
+
+### Validaciones implementadas
+
+* El `id` debe ser un número entero mayor a 0.
+* El cliente debe existir y pertenecer al usuario.
+* Las mismas reglas de [Registrar cliente](#registrar-cliente).
+
+### Respuesta exitosa — `200`
+
+```json
+{
+  "message": "Cliente actualizado correctamente",
+  "client": {
+    "id": 1,
+    "identificationNumber": "1023456",
+    "fullName": "Juan Pérez",
+    "phone": "3011112222",
+    "secondaryPhone": null,
+    "address": "Cra 10 # 20-30",
+    "neighborhood": "Centro",
+    "notes": null,
+    "isActive": true,
+    "createdAt": "2026-10-15T14:00:00.000Z",
+    "updatedAt": "2026-10-15T15:30:00.000Z",
+    "identificationType": {
+      "id": 1,
+      "code": "CC",
+      "name": "Cédula de ciudadanía"
+    }
+  }
+}
+```
+
+### Respuesta si el id no es válido — `400`
+
+```json
+{
+  "message": "El id del cliente no es válido"
+}
+```
+
+### Respuestas de validación — `400`
+
+Las mismas de [Registrar cliente](#respuestas-de-validación--400).
+
+### Respuesta si el cliente no existe o es de otro usuario — `400`
+
+```json
+{
+  "message": "El cliente no existe"
+}
+```
+
+### Respuesta si el tipo de identificación no existe o está inactivo — `400`
+
+```json
+{
+  "message": "El tipo de identificación no existe o está inactivo"
+}
+```
+
+### Respuesta si el documento ya lo tiene otro cliente — `400`
+
+```json
+{
+  "message": "Ya tienes un cliente registrado con ese número de identificación"
+}
+```
+
+### Respuesta en caso de error — `400`
+
+```json
+{
+  "message": "Error al actualizar el cliente"
+}
+```
+
+---
+
+## Activar o desactivar cliente
+
+### Endpoint
+
+```http
+PATCH /api/clients/:id/status
+```
+
+### Ejemplo
+
+```http
+PATCH /api/clients/1/status
+```
+
+### Header requerido
+
+```http
+Authorization: Bearer TOKEN
+```
+
+### Acceso permitido
+
+* USER
+* ADMIN
+
+### Descripción
+
+Cambia el estado de un cliente del usuario dueño del token. Un cliente inactivo se conserva con todos sus datos; solo deja de aparecer al filtrar por `status=active`.
+
+### Parámetros
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `id` | number | Id del cliente |
+
+### Campos del body
+
+| Campo | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `isActive` | boolean | Sí | `true` para activar, `false` para desactivar |
+
+### Body
+
+```json
+{
+  "isActive": false
+}
+```
+
+### Validaciones implementadas
+
+* El `id` debe ser un número entero mayor a 0.
+* `isActive` es obligatorio y debe ser `true` o `false` (no se acepta el texto `"false"`).
+* El cliente debe existir y pertenecer al usuario.
+
+### Respuesta exitosa al desactivar — `200`
+
+```json
+{
+  "message": "Cliente desactivado correctamente",
+  "client": {
+    "id": 1,
+    "fullName": "Juan Pérez",
+    "isActive": false,
+    "...": "demás campos del cliente"
+  }
+}
+```
+
+### Respuesta exitosa al activar — `200`
+
+```json
+{
+  "message": "Cliente activado correctamente",
+  "client": {
+    "id": 1,
+    "fullName": "Juan Pérez",
+    "isActive": true,
+    "...": "demás campos del cliente"
+  }
+}
+```
+
+### Respuesta si el id no es válido — `400`
+
+```json
+{
+  "message": "El id del cliente no es válido"
+}
+```
+
+### Respuesta si `isActive` no es válido — `400`
+
+```json
+{
+  "message": "El campo isActive es obligatorio y debe ser true o false"
+}
+```
+
+### Respuesta si el cliente no existe o es de otro usuario — `400`
+
+```json
+{
+  "message": "El cliente no existe"
+}
+```
+
+### Respuesta en caso de error — `400`
+
+```json
+{
+  "message": "Error al actualizar el estado del cliente"
 }
 ```
 

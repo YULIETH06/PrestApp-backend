@@ -13,7 +13,7 @@ import type {
 import {
     containsOnlyLetters,
     isValidEmail,
-} from "../../utils/validators.js";
+} from "../../utils/common/validators.js";
 
 // Valida que el archivo Excel tenga las columnas requeridas.
 const validateBulkUserColumns = (
